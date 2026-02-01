@@ -16,13 +16,13 @@
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Default owners for everything
-* eidos-maintainers @cullenmcdermott
+* @nvidia/eidos-maintainers @cullenmcdermott
 
 # CI/CD and automation
-/Makefile eidos-maintainers
-/.goreleaser.yaml eidos-maintainers
+/Makefile @nvidia/eidos-maintainers
+/.goreleaser.yaml @nvidia/eidos-maintainers
 
 # Configuration files
-/.versions.yaml eidos-maintainers
-/.golangci.yaml eidos-maintainers
-/.yamllint.yaml eidos-maintainers
+/.versions.yaml @nvidia/eidos-maintainers
+/.golangci.yaml @nvidia/eidos-maintainers
+/.yamllint.yaml @nvidia/eidos-maintainers
