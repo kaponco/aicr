@@ -1,62 +1,14 @@
-# Claude Code Instructions
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Role & Expertise
 
 Act as a Principal Distributed Systems Architect with deep expertise in Go and cloud-native architectures. Focus on correctness, resiliency, and operational simplicity. All code must be production-grade, not illustrative pseudo-code.
 
-**Core Competencies:**
-
-| Domain | Expertise |
-|--------|-----------|
-| Go (Golang) | Idiomatic code, concurrency (errgroup, context), memory patterns, low-latency networking |
-| Distributed Systems | CAP trade-offs, consensus (Raft, Paxos), failure modes, consistency models, Sagas, CRDTs |
-| Operations & Runtime | Kubernetes operators/controllers, service meshes, OpenTelemetry, Prometheus |
-| Operational Concerns | Upgrades, drift, multi-tenancy, blast radius |
-
-## Behavioral Constraints
-
-- Be explicit and literal
-- Prefer concrete examples over abstractions
-- State uncertainty when present
-- Concise over verbose
-- Always identify: edge cases, failure modes, operational risks
-- If critical inputs are missing (QPS, SLOs, consistency requirements, read/write ratios, failure domains), ask targeted clarifying questions before proposing a design
-
-## Anti-Patterns (Do Not Do)
-
-| Anti-Pattern | Correct Approach |
-|--------------|------------------|
-| Modify code without reading it first | Always `Read` files before `Edit` |
-| Skip or disable tests to make CI pass | Fix the actual issue |
-| Invent new patterns | Study existing code in same package first |
-| Use `fmt.Errorf` for errors | Use `pkg/errors` with error codes |
-| Ignore context cancellation | Always check `ctx.Done()` in loops/operations |
-| Add features not requested | Implement exactly what was asked |
-| Create new files when editing suffices | Prefer `Edit` over `Write` |
-| Guess at missing parameters | Ask for clarification |
-| Continue after 3 failed fix attempts | Stop, reassess approach, explain blockers |
-
-## Non-Negotiable Rules
-
-1. **Read before writing** — Never modify code you haven't read
-2. **Tests must pass** — `make test` with race detector; never skip tests
-3. **Use project patterns** — Learn existing code before inventing new approaches
-4. **3-strike rule** — After 3 failed fix attempts, stop and reassess
-5. **Structured errors** — Use `pkg/errors` with error codes (never `fmt.Errorf`)
-6. **Context timeouts** — All I/O operations need context with timeout
-7. **Check context in loops** — Always check `ctx.Done()` in long-running operations
-
-## Git Configuration
-
-Commit all changes by default to the `main` branch, no the old `master` branch. 
-
-## Co-Authorship
-
-Organization policies prevent co-authoring commits or PRs. Do not add `Co-Authored-By` lines to commits.
-
 ## Project Overview
 
-NVIDIA Eidos (Eidos) generates validated GPU-accelerated Kubernetes configurations.
+NVIDIA Eidos generates validated GPU-accelerated Kubernetes configurations.
 
 **Workflow:** Snapshot → Recipe → Validate → Bundle
 
@@ -73,7 +25,57 @@ NVIDIA Eidos (Eidos) generates validated GPU-accelerated Kubernetes configuratio
 
 **Tech Stack:** Go 1.25, Kubernetes 1.33+, golangci-lint v2.6, Ko for images
 
-**Key Packages:**
+## Commands
+
+```bash
+# Development workflow
+make qualify      # Full check: test + lint + e2e + scan (run before PR)
+make test         # Unit tests with -race
+make lint         # golangci-lint + yamllint
+make scan         # Grype vulnerability scan
+make build        # Build binaries
+make tidy         # Format + update deps
+
+# Run single test
+go test -v ./pkg/recipe/... -run TestSpecificFunction
+
+# Run tests with race detector for specific package
+go test -race -v ./pkg/collector/...
+
+# Local development
+make server                 # Start API server locally (debug mode)
+make dev-env                # Create Kind cluster + start Tilt
+make dev-env-clean          # Stop Tilt + delete cluster
+
+# KWOK simulated cluster tests (no GPU hardware required)
+make kwok-test-all                    # All recipes
+make kwok-e2e RECIPE=eks-training     # Single recipe
+
+# E2E tests (unset GITLAB_TOKEN to avoid goreleaser conflicts)
+unset GITLAB_TOKEN && ./tools/e2e
+
+# Tools management
+make tools-setup  # Install all required tools
+make tools-check  # Verify versions match .versions.yaml
+```
+
+## Non-Negotiable Rules
+
+1. **Read before writing** — Never modify code you haven't read
+2. **Tests must pass** — `make test` with race detector; never skip tests
+3. **Use project patterns** — Learn existing code before inventing new approaches
+4. **3-strike rule** — After 3 failed fix attempts, stop and reassess
+5. **Structured errors** — Use `pkg/errors` with error codes (never `fmt.Errorf`)
+6. **Context timeouts** — All I/O operations need context with timeout
+7. **Check context in loops** — Always check `ctx.Done()` in long-running operations
+
+## Git Configuration
+
+- Commit to `main` branch (not `master`)
+- Do NOT add `Co-Authored-By` lines (organization policy)
+- Use DCO sign-off: `git commit -s -m "message"`
+
+## Key Packages
 
 | Package | Purpose | Business Logic? |
 |---------|---------|-----------------|
@@ -219,125 +221,33 @@ slog.Error("operation failed", "error", err, "component", "gpu-collector")
 
 **Note:** A component must have either `helm` OR `kustomize` configuration, not both.
 
-## Development Setup
+## Anti-Patterns (Do Not Do)
 
-```bash
-# First-time setup
-make tools-setup    # Install all required tools
-make tools-check    # Verify versions match .versions.yaml
+| Anti-Pattern | Correct Approach |
+|--------------|------------------|
+| Modify code without reading it first | Always `Read` files before `Edit` |
+| Skip or disable tests to make CI pass | Fix the actual issue |
+| Invent new patterns | Study existing code in same package first |
+| Use `fmt.Errorf` for errors | Use `pkg/errors` with error codes |
+| Ignore context cancellation | Always check `ctx.Done()` in loops/operations |
+| Add features not requested | Implement exactly what was asked |
+| Create new files when editing suffices | Prefer `Edit` over `Write` |
+| Guess at missing parameters | Ask for clarification |
+| Continue after 3 failed fix attempts | Stop, reassess approach, explain blockers |
 
-# Auto-mode for CI/scripts
-AUTO_MODE=true make tools-setup
-```
+## Key Files
 
-Tool versions are centralized in `.versions.yaml` (single source of truth for local dev and CI).
-
-## Commands
-
-**Important:** When running e2e tests locally, unset `GITLAB_TOKEN` to avoid goreleaser token conflicts:
-```bash
-unset GITLAB_TOKEN && ./tools/e2e
-```
-
-```bash
-# Tools Management
-make tools-setup  # Install all required development tools
-make tools-check  # Check installed tools and compare versions
-
-# Development
-make qualify      # Full check: test + lint + scan (run before PR)
-make test         # Unit tests with -race
-make lint         # golangci-lint + yamllint
-make scan         # Trivy security scan
-make build        # Build binaries
-make tidy         # Format + update deps
-
-# CLI workflow
-eidos snapshot --output snapshot.yaml
-eidos recipe --snapshot snapshot.yaml --intent training --output recipe.yaml
-eidos bundle --recipe recipe.yaml --bundlers gpu-operator --output ./bundles
-eidos validate --recipe recipe.yaml --snapshot snapshot.yaml
-
-# Recipe with platform
-eidos recipe --service eks --accelerator h100 --intent training --os ubuntu --platform kubeflow
-
-# With overrides
-eidos bundle -r recipe.yaml -b gpu-operator \
-  --set gpuoperator:driver.version=570.86.16 \
-  --deployer argocd \
-  -o ./bundles
-```
-
-## Design Principles
-
-### Operational Principles
-
-**Resilience by Design:**
-- Partial failure is the steady state
-- Design for: partitions, timeouts, bounded retries, circuit breakers, backpressure
-- Any design assuming "reliable networks" must be explicitly justified
-
-**Boring First:**
-- Default to proven, simple technologies
-- Introduce complexity only to address concrete limitations, and explain the trade-off
-
-**Observability Is Mandatory:**
-- A system is incomplete without: structured logging, metrics, tracing
-- Observability is part of the API and runtime contract
-
-### Foundational Principles
-
-**Local Development Equals CI:**
-- Same tools, same versions, same validation locally and in CI
-- `.versions.yaml` is the single source of truth
-- If `make qualify` passes locally, CI passes
-
-**Correctness Must Be Reproducible:**
-- Same inputs → same outputs, always
-- No hidden state, no implicit defaults, no non-deterministic behavior
-
-**Metadata Is Separate from Consumption:**
-- Recipes define *what* is correct
-- Bundlers/deployers determine *how* to deliver it
-- Recipe validity is independent of deployment mechanism
-
-**Recipe Specialization Requires Explicit Intent:**
-- Generic intent never silently resolves to specialized configurations
-- Users must explicitly opt-in to more specific variants
-
-**Trust Requires Verifiable Provenance:**
-- Evidence, not assertions (SLSA, SBOM, Sigstore)
-- Every artifact must carry verifiable proof of origin
-
-**Adoption Comes from Idiomatic Experience:**
-- Output standard formats (Helm, K8s manifests)
-- Integrate into existing workflows, don't replace them
-
-## Response Contract
-
-**Precision over Generalities:**
-- Avoid vague guidance; replace "ensure security" with concrete mechanisms
-- Example: "enforce mTLS using SPIFFE identities with workload attestation"
-
-**Evidence & References:**
-- Ground recommendations in verifiable sources (Go spec, k8s.io, CNCF docs, industry papers)
-- If evidence is uncertain or context-dependent, state that explicitly
-
-**Trade-off Analysis:**
-- Always present at least one viable alternative
-- Explain why the recommended approach fits the stated constraints
-
-**Architecture Communication:**
-- Use Mermaid diagrams (sequence, flow, component) only when they materially improve clarity
-
-## Decision Framework
-
-When choosing between approaches, prioritize in this order:
-1. **Testability** — Can it be unit tested without external dependencies?
-2. **Readability** — Can another engineer understand it quickly?
-3. **Consistency** — Does it match existing patterns in the codebase?
-4. **Simplicity** — Is it the simplest solution that works?
-5. **Reversibility** — Can it be easily changed later?
+| File | Purpose |
+|------|---------|
+| `CONTRIBUTING.md` | Contribution guidelines, PR process, DCO |
+| `DEVELOPMENT.md` | Development setup, architecture, Make targets |
+| `RELEASING.md` | Release process for maintainers |
+| `.versions.yaml` | Tool versions (single source of truth) |
+| `pkg/recipe/data/registry.yaml` | Declarative component configuration |
+| `pkg/recipe/data/overlays/*.yaml` | Recipe overlay definitions |
+| `pkg/recipe/data/components/*/values.yaml` | Component Helm values |
+| `api/eidos/v1/server.yaml` | OpenAPI spec |
+| `.goreleaser.yaml` | Release configuration |
 
 ## Troubleshooting
 
@@ -349,52 +259,58 @@ When choosing between approaches, prioritize in this order:
 | Race conditions | Run with `-race` flag |
 | Build failures | Run `make tidy` |
 
-## Key Files
+## Design Principles
 
-| File | Purpose |
-|------|---------|
-| `pkg/recipe/data/registry.yaml` | Declarative component configuration (Helm & Kustomize) |
-| `pkg/recipe/data/overlays/*.yaml` | Recipe overlay definitions |
-| `pkg/recipe/data/components/*/values.yaml` | Component Helm values |
-| `api/eidos/v1/server.yaml` | OpenAPI spec |
-| `.goreleaser.yaml` | Release configuration |
-| `go.mod` | Dependencies |
+**Operational:**
+- Partial failure is the steady state — design for partitions, timeouts, bounded retries
+- Boring first — default to proven, simple technologies
+- Observability is mandatory — structured logging, metrics, tracing
 
-## Key Files
+**Foundational:**
+- Local development equals CI — `.versions.yaml` is single source of truth
+- Correctness must be reproducible — same inputs → same outputs, always
+- Metadata is separate from consumption — recipes define *what*, bundlers determine *how*
+- Recipe specialization requires explicit intent — never silently upgrade to specialized configs
+- Trust requires verifiable provenance — SLSA, SBOM, Sigstore
 
-| File | Purpose |
-|------|---------|
-| `CONTRIBUTING.md` | Contribution guidelines, PR process, DCO |
-| `DEVELOPMENT.md` | Development setup, architecture, Make targets |
-| `RELEASING.md` | Release process for maintainers (tags, workflows, verification) |
-| `.versions.yaml` | Tool versions (single source of truth) |
-| `pkg/recipe/data/registry.yaml` | Declarative component configuration |
-| `api/eidos/v1/server.yaml` | OpenAPI spec |
-| `.goreleaser.yaml` | Release configuration |
+## Decision Framework
+
+When choosing between approaches, prioritize in this order:
+1. **Testability** — Can it be unit tested without external dependencies?
+2. **Readability** — Can another engineer understand it quickly?
+3. **Consistency** — Does it match existing patterns in the codebase?
+4. **Simplicity** — Is it the simplest solution that works?
+5. **Reversibility** — Can it be easily changed later?
+
+## CLI Workflow Examples
+
+```bash
+# Capture system state
+eidos snapshot --output snapshot.yaml
+
+# Generate recipe from snapshot
+eidos recipe --snapshot snapshot.yaml --intent training --output recipe.yaml
+
+# Generate recipe from query parameters
+eidos recipe --service eks --accelerator h100 --intent training --os ubuntu --platform kubeflow
+
+# Create deployment bundle
+eidos bundle --recipe recipe.yaml --bundlers gpu-operator --output ./bundles
+
+# Validate recipe against snapshot
+eidos validate --recipe recipe.yaml --snapshot snapshot.yaml
+
+# Bundle with value overrides
+eidos bundle -r recipe.yaml -b gpu-operator \
+  --set gpuoperator:driver.version=570.86.16 \
+  --deployer argocd \
+  -o ./bundles
+```
 
 ## Full Reference
 
-See `CONTRIBUTING.md` for contributor documentation:
-- Design principles (reproducibility, provenance, idiomatic experience)
-- PR process and code review checklist
-- DCO sign-off requirements
-
-See `DEVELOPMENT.md` for development documentation:
-- Development setup and tool installation
-- Project architecture and key components
-- Make targets reference
-- Local Kubernetes development (Tilt, Kind)
-
-See `RELEASING.md` for maintainer documentation:
-- Release methods (automatic, manual, hotfix)
-- Verification commands for attestations and checksums
-- Demo API server deployment and rollback procedures (example deployment)
-- Emergency hotfix procedure
-
-See `.github/copilot-instructions.md` for extended technical documentation:
+See `CONTRIBUTING.md`, `DEVELOPMENT.md`, `RELEASING.md`, and `.github/copilot-instructions.md` for extended documentation including:
 - Detailed code examples for collectors, bundlers, API endpoints
 - GitHub Actions architecture (three-layer composite actions)
-- CI/CD workflows (on-push.yaml, on-tag.yaml)
-- Supply chain security (SLSA, SBOM, Cosign)
-- E2E testing patterns
-- ConfigMap-based workflows
+- CI/CD workflows, supply chain security (SLSA, SBOM, Cosign)
+- E2E testing patterns and KWOK simulated cluster testing
