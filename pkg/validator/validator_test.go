@@ -543,7 +543,7 @@ func TestGenerateRunID(t *testing.T) {
 	// Test that RunID generation produces a valid format
 	runID := generateRunID()
 
-	// Expected format: YYYYMMDD-HHMMSS-XXXX (e.g., "20260206-140523-a3f9")
+	// Expected format: YYYYMMDD-HHMMSS-XXXXXXXXXXXXXXXX (16 hex chars)
 	parts := strings.Split(runID, "-")
 	if len(parts) != 3 {
 		t.Errorf("RunID format incorrect, expected 3 parts, got %d: %s", len(parts), runID)
@@ -559,9 +559,9 @@ func TestGenerateRunID(t *testing.T) {
 		t.Errorf("Time part should be 6 characters (HHMMSS), got %d: %s", len(parts[1]), parts[1])
 	}
 
-	// Check random part (8 hex characters)
-	if len(parts[2]) != 8 {
-		t.Errorf("Random part should be 8 characters, got %d: %s", len(parts[2]), parts[2])
+	// Check random part (16 hex characters)
+	if len(parts[2]) != 16 {
+		t.Errorf("Random part should be 16 characters, got %d: %s", len(parts[2]), parts[2])
 	}
 }
 

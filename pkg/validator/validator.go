@@ -139,13 +139,13 @@ func WithRunID(runID string) Option {
 }
 
 // generateRunID creates a unique identifier for a validation run.
-// Format: YYYYMMDD-HHMMSS-RANDOM (e.g., "20260206-140523-a3f9")
+// Format: YYYYMMDD-HHMMSS-RANDOM (e.g., "20260206-140523-a3f9b2c1e7d04a68")
 func generateRunID() string {
 	// Generate timestamp
 	timestamp := time.Now().Format("20060102-150405")
 
-	// Generate 8 random hex characters
-	randomBytes := make([]byte, 4)
+	// Generate 16 random hex characters (8 bytes)
+	randomBytes := make([]byte, 8)
 	if _, err := rand.Read(randomBytes); err != nil {
 		// Fallback to timestamp only if random generation fails
 		return timestamp

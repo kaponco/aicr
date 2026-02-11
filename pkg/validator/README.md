@@ -172,9 +172,9 @@ The test wrapper pattern enables:
 
 Each validation run is assigned a unique **RunID** for resource isolation and resumability:
 
-**RunID Format:** `YYYYMMDD-HHMMSS-XXXX` (e.g., `20260206-140523-a3f9`)
+**RunID Format:** `YYYYMMDD-HHMMSS-XXXXXXXXXXXXXXXX` (e.g., `20260206-140523-a3f9b2c1e7d04a68b2c1e7d04a68`)
 - Timestamp: Date and time when validation started
-- Random suffix: 4 hex characters for uniqueness
+- Random suffix: 16 hex characters for uniqueness
 
 **Resource Naming:**
 All resources created during a validation run include the RunID:
@@ -191,7 +191,7 @@ All resources created during a validation run include the RunID:
 **CLI Output:**
 ```bash
 $ eidos validate --phase all --recipe recipe.yaml --snapshot snapshot.yaml
-Starting validation run: 20260206-140523-a3f9
+Starting validation run: 20260206-140523-a3f9b2c1e7d04a68
 ...
 ```
 
@@ -203,11 +203,11 @@ kubectl get configmaps -n eidos-validation \
 
 # List resources for specific run
 kubectl get jobs,configmaps -n eidos-validation \
-  -l eidos.nvidia.com/run-id=20260206-140523-a3f9
+  -l eidos.nvidia.com/run-id=20260206-140523-a3f9b2c1e7d04a68
 
 # View run details
 kubectl get configmap -n eidos-validation \
-  -l eidos.nvidia.com/run-id=20260206-140523-a3f9 \
+  -l eidos.nvidia.com/run-id=20260206-140523-a3f9b2c1e7d04a68 \
   -o yaml
 ```
 
@@ -215,7 +215,7 @@ kubectl get configmap -n eidos-validation \
 ```bash
 # Cleanup specific validation run
 kubectl delete jobs,configmaps -n eidos-validation \
-  -l eidos.nvidia.com/run-id=20260206-140523-a3f9
+  -l eidos.nvidia.com/run-id=20260206-140523-a3f9b2c1e7d04a68
 
 # Cleanup all validation runs (caution!)
 kubectl delete jobs,configmaps -n eidos-validation \
@@ -238,21 +238,21 @@ The validator creates a single ValidationResult ConfigMap per validation run tha
 ```bash
 # New validation (auto-generates RunID)
 eidos validate --phase all --recipe recipe.yaml --snapshot snapshot.yaml
-# Output: Starting validation run: 20260206-140523-a3f9
+# Output: Starting validation run: 20260206-140523-a3f9b2c1e7d04a68
 
 # Validation fails at deployment phase (readiness passed)
 # Resume from failed phase
-eidos validate --phase all --resume 20260206-140523-a3f9
+eidos validate --phase all --resume 20260206-140523-a3f9b2c1e7d04a68
 # Reads existing results, skips readiness (passed), continues from deployment
 ```
 
 **Query Validation State:**
 ```bash
 # View current validation progress
-kubectl get cm eidos-validation-result-20260206-140523-a3f9 -o yaml
+kubectl get cm eidos-validation-result-20260206-140523-a3f9b2c1e7d04a68 -o yaml
 
 # Check which phases passed/failed
-kubectl get cm eidos-validation-result-20260206-140523-a3f9 \
+kubectl get cm eidos-validation-result-20260206-140523-a3f9b2c1e7d04a68 \
   -o jsonpath='{.data.result\.yaml}' | yq '.phases'
 ```
 
@@ -550,10 +550,10 @@ Only readiness constraints can evaluate inline because they only need snapshot d
 **Example:**
 ```bash
 # Check validation progress
-kubectl get cm eidos-validation-result-20260206-140523-a3f9 -o yaml
+kubectl get cm eidos-validation-result-20260206-140523-a3f9b2c1e7d04a68 -o yaml
 
 # Resume from failure
-eidos validate --resume 20260206-140523-a3f9
+eidos validate --resume 20260206-140523-a3f9b2c1e7d04a68
 ```
 
 ## Examples
