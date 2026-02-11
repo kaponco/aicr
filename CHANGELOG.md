@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.7] - 2026-02-11
+
+### Bug Fixes
+
+- Use native cross-compilation in validator Dockerfile by [@mchmarny](https://github.com/mchmarny)
+
 ## [0.5.6] - 2026-02-11
 
 ### Bug Fixes
