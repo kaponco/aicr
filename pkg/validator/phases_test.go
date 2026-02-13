@@ -876,6 +876,21 @@ func TestBuildTestPattern(t *testing.T) {
 			want:  "^(TestOperatorHealth|TestExpectedResources)$",
 		},
 		{
+			name: "deployment with unregistered constraints falls through to checks only",
+			recipe: &recipe.RecipeResult{
+				Validation: &recipe.ValidationConfig{
+					Deployment: &recipe.ValidationPhase{
+						Constraints: []recipe.Constraint{
+							{Name: "Deployment.unknown-app.version", Value: ">= v1.0.0"},
+						},
+						Checks: []string{"operator-health"},
+					},
+				},
+			},
+			phase: "deployment",
+			want:  "^(TestOperatorHealth)$",
+		},
+		{
 			name: "performance phase returns empty (TODO stub)",
 			recipe: &recipe.RecipeResult{
 				Validation: &recipe.ValidationConfig{
@@ -980,6 +995,38 @@ func TestValidateRecipeRegistrations(t *testing.T) {
 			},
 			phase:          "performance",
 			expectWarnings: false,
+		},
+		{
+			name: "performance - unregistered constraint logs warning",
+			recipe: &recipe.RecipeResult{
+				Validation: &recipe.ValidationConfig{
+					Performance: &recipe.ValidationPhase{
+						Constraints: []recipe.Constraint{
+							{Name: "Performance.nonexistent-metric.value", Value: ">= 100"},
+						},
+						Checks: []string{"nonexistent-perf-check"},
+					},
+				},
+			},
+			phase:             "performance",
+			expectWarnings:    true,
+			expectedItemCount: 1,
+		},
+		{
+			name: "conformance - unregistered constraint and check logs warning",
+			recipe: &recipe.RecipeResult{
+				Validation: &recipe.ValidationConfig{
+					Conformance: &recipe.ValidationPhase{
+						Constraints: []recipe.Constraint{
+							{Name: "Conformance.fake.value", Value: ">= 1.0"},
+						},
+						Checks: []string{"fake-conformance-check"},
+					},
+				},
+			},
+			phase:             "conformance",
+			expectWarnings:    true,
+			expectedItemCount: 1,
 		},
 		{
 			name: "conformance - nil validation (no warnings)",

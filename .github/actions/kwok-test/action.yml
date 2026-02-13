@@ -39,6 +39,10 @@ inputs:
     description: 'kubectl version to install'
     required: false
     default: 'v1.35.0'
+  kind_node_image:
+    description: 'Kind node image for testing'
+    required: false
+    default: ''
   upload_artifacts:
     description: 'Whether to upload debug artifacts on failure'
     required: false
@@ -121,6 +125,7 @@ runs:
       shell: bash
       env:
         KWOK_CLUSTER: eidos-kwok-test
+        KIND_NODE_IMAGE: ${{ inputs.kind_node_image }}
       run: |
         bash kwok/scripts/run-all-recipes.sh ${{ inputs.recipe }}
 

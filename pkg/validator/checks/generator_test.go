@@ -239,3 +239,120 @@ func TestGenerateConstraintValidator_EmptyConstraint(t *testing.T) {
 		t.Error("expected error for empty constraint, got nil")
 	}
 }
+
+func TestGenerateConstraintValidator_EmptyPhase(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "generator-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	cfg := GeneratorConfig{
+		ConstraintName: "Deployment.test.version",
+		Phase:          "",
+		Description:    "Test",
+		OutputDir:      tmpDir,
+	}
+
+	err = GenerateConstraintValidator(cfg)
+	if err == nil {
+		t.Error("expected error for empty phase, got nil")
+	}
+}
+
+func TestGenerateConstraintValidator_EmptyOutputDir(t *testing.T) {
+	cfg := GeneratorConfig{
+		ConstraintName: "Deployment.test.version",
+		Phase:          "deployment",
+		Description:    "Test",
+		OutputDir:      "",
+	}
+
+	err := GenerateConstraintValidator(cfg)
+	if err == nil {
+		t.Error("expected error for empty output dir, got nil")
+	}
+}
+
+func TestGenerateConstraintValidator_DefaultDescription(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "generator-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	outputDir := filepath.Join(tmpDir, "deployment")
+	if mkdirErr := os.MkdirAll(outputDir, 0755); mkdirErr != nil {
+		t.Fatalf("failed to create output dir: %v", mkdirErr)
+	}
+
+	cfg := GeneratorConfig{
+		ConstraintName: "Deployment.test-app.version",
+		Phase:          "deployment",
+		Description:    "", // empty description triggers default
+		OutputDir:      outputDir,
+	}
+
+	err = GenerateConstraintValidator(cfg)
+	if err != nil {
+		t.Fatalf("GenerateConstraintValidator() error = %v", err)
+	}
+
+	// Verify integration test file contains default description
+	integrationContent, readErr := os.ReadFile(filepath.Join(outputDir, "deployment_test_app_version_integration_test.go"))
+	if readErr != nil {
+		t.Fatalf("failed to read integration test file: %v", readErr)
+	}
+
+	if !strings.Contains(string(integrationContent), "Validates Deployment.test-app.version constraint") {
+		t.Error("integration test missing default description")
+	}
+}
+
+func TestGenerateConstraintValidator_InvalidOutputDir(t *testing.T) {
+	cfg := GeneratorConfig{
+		ConstraintName: "Deployment.test.version",
+		Phase:          "deployment",
+		Description:    "Test",
+		OutputDir:      "/nonexistent/path/that/does/not/exist",
+	}
+
+	err := GenerateConstraintValidator(cfg)
+	if err == nil {
+		t.Error("expected error for invalid output directory, got nil")
+	}
+}
+
+func TestGenerateHelperFile_CreateError(t *testing.T) {
+	// Use a path that cannot be created (directory does not exist)
+	err := generateHelperFile("/nonexistent/dir/file.go", "TestFunc", GeneratorConfig{
+		OutputDir:      "/nonexistent/dir",
+		ConstraintName: "Test.constraint",
+		Description:    "Test",
+	})
+	if err == nil {
+		t.Error("expected error when output path does not exist, got nil")
+	}
+}
+
+func TestGenerateUnitTestFile_CreateError(t *testing.T) {
+	err := generateUnitTestFile("/nonexistent/dir/file_test.go", "TestFunc", GeneratorConfig{
+		OutputDir:      "/nonexistent/dir",
+		ConstraintName: "Test.constraint",
+	})
+	if err == nil {
+		t.Error("expected error when output path does not exist, got nil")
+	}
+}
+
+func TestGenerateIntegrationTestFile_CreateError(t *testing.T) {
+	err := generateIntegrationTestFile("/nonexistent/dir/file_integration_test.go", "TestFunc", "TestTestFunc", GeneratorConfig{
+		OutputDir:      "/nonexistent/dir",
+		ConstraintName: "Test.constraint",
+		Phase:          "deployment",
+		Description:    "Test",
+	})
+	if err == nil {
+		t.Error("expected error when output path does not exist, got nil")
+	}
+}

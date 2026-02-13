@@ -46,7 +46,7 @@ runs:
       run: |
         set -euo pipefail
         # Install ko from binary release (go install puts in GOPATH which isn't in PATH)
-        KO_VERSION="0.18.0"  # From .versions.yaml
+        KO_VERSION="0.18.0"  # From .settings.yaml
         KO_URL="https://github.com/ko-build/ko/releases/download/v${KO_VERSION}/ko_${KO_VERSION}_Linux_x86_64.tar.gz"
         KO_TMP="$(mktemp -d)"
         curl -fsSL "$KO_URL" | tar -xzC "$KO_TMP"

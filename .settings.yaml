@@ -43,3 +43,17 @@ testing_tools:
   helm: 'v4.1.0'
   kwok: 'v0.7.0'
   chainsaw: 'v0.2.14'
+
+# Quality Thresholds
+quality:
+  coverage_threshold: '70'
+  lint_timeout: '5m'
+  test_timeout: '10m'
+
+# Build Configuration
+build:
+  image_registry: 'ghcr.io/nvidia'
+
+# Testing Configuration
+testing:
+  kind_node_image: 'kindest/node:v1.32.0'

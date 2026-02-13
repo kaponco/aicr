@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"github.com/NVIDIA/eidos/pkg/errors"
 )
 
 // GeneratorConfig holds configuration for generating validator code.
@@ -46,13 +48,13 @@ type GeneratorConfig struct {
 // - Integration test file (*_validator_integration_test.go)
 func GenerateConstraintValidator(cfg GeneratorConfig) error {
 	if cfg.ConstraintName == "" {
-		return fmt.Errorf("constraint name is required")
+		return errors.New(errors.ErrCodeInvalidRequest, "constraint name is required")
 	}
 	if cfg.Phase == "" {
-		return fmt.Errorf("phase is required")
+		return errors.New(errors.ErrCodeInvalidRequest, "phase is required")
 	}
 	if cfg.OutputDir == "" {
-		return fmt.Errorf("output directory is required")
+		return errors.New(errors.ErrCodeInvalidRequest, "output directory is required")
 	}
 
 	// Derive names from constraint
@@ -68,19 +70,19 @@ func GenerateConstraintValidator(cfg GeneratorConfig) error {
 	// Generate helper functions file
 	helperFile := filepath.Join(cfg.OutputDir, fileBaseName+".go")
 	if err := generateHelperFile(helperFile, funcName, cfg); err != nil {
-		return fmt.Errorf("failed to generate helper file: %w", err)
+		return errors.Wrap(errors.ErrCodeInternal, "failed to generate helper file", err)
 	}
 
 	// Generate unit test file
 	unitTestFile := filepath.Join(cfg.OutputDir, fileBaseName+"_test.go")
 	if err := generateUnitTestFile(unitTestFile, funcName, cfg); err != nil {
-		return fmt.Errorf("failed to generate unit test file: %w", err)
+		return errors.Wrap(errors.ErrCodeInternal, "failed to generate unit test file", err)
 	}
 
 	// Generate integration test file
 	integrationTestFile := filepath.Join(cfg.OutputDir, fileBaseName+"_integration_test.go")
 	if err := generateIntegrationTestFile(integrationTestFile, funcName, testName, cfg); err != nil {
-		return fmt.Errorf("failed to generate integration test file: %w", err)
+		return errors.Wrap(errors.ErrCodeInternal, "failed to generate integration test file", err)
 	}
 
 	fmt.Printf("✓ Generated constraint validator files:\n")

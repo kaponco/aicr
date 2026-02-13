@@ -94,7 +94,7 @@ These principles guide all design decisions in Eidos. When faced with trade-offs
 
 The same tools, same versions, and same validation run locally and in CI.
 
-**What:** Tool versions are centralized in `.versions.yaml`. Both `make tools-setup` (local) and GitHub Actions use this single source of truth. `make qualify` runs the exact same checks as CI.
+**What:** Tool versions are centralized in `.settings.yaml`. Both `make tools-setup` (local) and GitHub Actions use this single source of truth. `make qualify` runs the exact same checks as CI.
 
 **Why:** "Works on my machine" is not acceptable. If a contributor can run `make qualify` locally and it passes, CI will pass. This eliminates surprise failures and reduces feedback loops.
 

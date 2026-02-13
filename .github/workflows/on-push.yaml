@@ -62,7 +62,8 @@ jobs:
           golangci_lint_version: ${{ steps.versions.outputs.golangci_lint }}
           addlicense_version: ${{ steps.versions.outputs.addlicense }}
           coverage_report: 'true'
-          coverage_threshold: '70'
+          coverage_threshold: ${{ steps.versions.outputs.coverage_threshold }}
+          lint_timeout: ${{ steps.versions.outputs.lint_timeout }}
 
   integration:
     name: Integration Tests

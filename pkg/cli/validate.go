@@ -23,6 +23,7 @@ import (
 	"github.com/urfave/cli/v3"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/NVIDIA/eidos/pkg/errors"
 	"github.com/NVIDIA/eidos/pkg/recipe"
 	"github.com/NVIDIA/eidos/pkg/serializer"
 	"github.com/NVIDIA/eidos/pkg/snapshotter"
@@ -50,12 +51,12 @@ type validateAgentConfig struct {
 func parseValidateAgentConfig(cmd *cli.Command) (*validateAgentConfig, error) {
 	nodeSelector, err := snapshotter.ParseNodeSelectors(cmd.StringSlice("node-selector"))
 	if err != nil {
-		return nil, fmt.Errorf("invalid node-selector: %w", err)
+		return nil, errors.Wrap(errors.ErrCodeInvalidRequest, "invalid node-selector", err)
 	}
 
 	tolerations, err := snapshotter.ParseTolerations(cmd.StringSlice("toleration"))
 	if err != nil {
-		return nil, fmt.Errorf("invalid toleration: %w", err)
+		return nil, errors.Wrap(errors.ErrCodeInvalidRequest, "invalid toleration", err)
 	}
 
 	return &validateAgentConfig{
@@ -98,7 +99,7 @@ func parseValidationPhases(phaseStrs []string) ([]validator.ValidationPhaseName,
 			// "all" means all phases - return PhaseAll which is handled specially by validator
 			return []validator.ValidationPhaseName{validator.PhaseAll}, nil
 		default:
-			return nil, fmt.Errorf("invalid phase %q: must be one of: readiness, deployment, performance, conformance, all", phaseStr)
+			return nil, errors.New(errors.ErrCodeInvalidRequest, fmt.Sprintf("invalid phase %q: must be one of: readiness, deployment, performance, conformance, all", phaseStr))
 		}
 	}
 
@@ -134,7 +135,7 @@ func deployAgentForValidation(ctx context.Context, cfg *validateAgentConfig) (*s
 
 	snap, err := snapshotter.DeployAndGetSnapshot(ctx, agentConfig)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to capture snapshot: %w", err)
+		return nil, "", errors.Wrap(errors.ErrCodeInternal, "failed to capture snapshot", err)
 	}
 
 	source := fmt.Sprintf("agent:%s/%s", cfg.namespace, cfg.jobName)
@@ -178,7 +179,7 @@ func runValidation(
 	// Validate with phase support
 	result, err := v.ValidatePhases(ctx, phases, rec, snap)
 	if err != nil {
-		return fmt.Errorf("validation failed: %w", err)
+		return errors.Wrap(errors.ErrCodeInternal, "validation failed", err)
 	}
 
 	// Set source information
@@ -188,7 +189,7 @@ func runValidation(
 	// Serialize output
 	ser, err := serializer.NewFileWriterOrStdout(outFormat, output)
 	if err != nil {
-		return fmt.Errorf("failed to create output writer: %w", err)
+		return errors.Wrap(errors.ErrCodeInternal, "failed to create output writer", err)
 	}
 	defer func() {
 		if closer, ok := ser.(interface{ Close() error }); ok {
@@ -199,7 +200,7 @@ func runValidation(
 	}()
 
 	if err := ser.Serialize(ctx, result); err != nil {
-		return fmt.Errorf("failed to serialize validation result: %w", err)
+		return errors.Wrap(errors.ErrCodeInternal, "failed to serialize validation result", err)
 	}
 
 	slog.Info("validation completed",
@@ -211,7 +212,7 @@ func runValidation(
 
 	// Check if we should fail on validation errors
 	if failOnError && result.Summary.Status == validator.ValidationStatusFail {
-		return fmt.Errorf("validation failed: %d constraint(s) did not pass", result.Summary.Failed)
+		return errors.New(errors.ErrCodeInternal, fmt.Sprintf("validation failed: %d constraint(s) did not pass", result.Summary.Failed))
 	}
 
 	return nil
@@ -378,7 +379,7 @@ Resume a previous validation run from where it left off:
 
 			// Recipe is always required
 			if recipeFilePath == "" {
-				return fmt.Errorf("--recipe is required")
+				return errors.New(errors.ErrCodeInvalidRequest, "--recipe is required")
 			}
 
 			// Parse output format
@@ -400,7 +401,7 @@ Resume a previous validation run from where it left off:
 			// Load recipe
 			rec, err := serializer.FromFileWithKubeconfig[recipe.RecipeResult](recipeFilePath, kubeconfig)
 			if err != nil {
-				return fmt.Errorf("failed to load recipe from %q: %w", recipeFilePath, err)
+				return errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to load recipe from %q", recipeFilePath), err)
 			}
 
 			// Get snapshot - either from file or by deploying an agent
@@ -412,7 +413,7 @@ Resume a previous validation run from where it left off:
 				slog.Info("loading snapshot", "uri", snapshotFilePath)
 				snap, err = serializer.FromFileWithKubeconfig[snapshotter.Snapshot](snapshotFilePath, kubeconfig)
 				if err != nil {
-					return fmt.Errorf("failed to load snapshot from %q: %w", snapshotFilePath, err)
+					return errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to load snapshot from %q", snapshotFilePath), err)
 				}
 				snapshotSource = snapshotFilePath
 			} else {

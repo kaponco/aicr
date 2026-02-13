@@ -69,6 +69,7 @@ jobs:
           helm_version: ${{ steps.versions.outputs.helm }}
           kwok_version: ${{ steps.versions.outputs.kwok }}
           kubectl_version: ${{ steps.versions.outputs.kubectl }}
+          kind_node_image: ${{ steps.versions.outputs.kind_node_image }}
 
   summary:
     name: KWOK Test Summary
