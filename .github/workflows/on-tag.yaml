@@ -32,74 +32,30 @@ env:
 jobs:
 
   # =============================================================================
-  # Test Jobs (run in parallel, same as on-push.yaml)
+  # Test Jobs (reusable workflow — same suite as on-push.yaml)
   # =============================================================================
 
-  unit:
-    name: Unit Tests
+  tests:
+    uses: ./.github/workflows/qualification.yaml
+    permissions:
+      actions: read
+      contents: read
+
+  security-scan:
+    name: Security Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
       - name: Checkout Code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-
-      - name: Load versions
-        id: versions
-        uses: ./.github/actions/load-versions
-
-      - name: Run Go CI (setup, test, lint)
-        uses: ./.github/actions/go-ci
-        with:
-          go_version: ${{ steps.versions.outputs.go }}
-          golangci_lint_version: ${{ steps.versions.outputs.golangci_lint }}
-          addlicense_version: ${{ steps.versions.outputs.addlicense }}
-          coverage_report: 'false'
 
       - name: Security Scan
         uses: ./.github/actions/security-scan
         with:
           severity: 'MEDIUM'
           category: 'trivy-fs'
-
-  integration:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-
-      - name: Load versions
-        id: versions
-        uses: ./.github/actions/load-versions
-
-      - name: Run Integration Tests
-        uses: ./.github/actions/integration
-        with:
-          go_version: ${{ steps.versions.outputs.go }}
-
-  e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
-
-      - name: Load versions
-        id: versions
-        uses: ./.github/actions/load-versions
-
-      - name: Run E2E Tests
-        uses: ./.github/actions/e2e
-        with:
-          go_version: ${{ steps.versions.outputs.go }}
 
   # =============================================================================
   # Build Job: GoReleaser (binaries, ko images, draft GitHub release)
@@ -108,7 +64,7 @@ jobs:
   build:
     name: Build and Release (Draft)
     runs-on: ubuntu-latest
-    needs: [unit, integration, e2e]
+    needs: [tests, security-scan]
     timeout-minutes: 30
     outputs:
       release_outcome: ${{ steps.release.outputs.release_outcome }}
@@ -144,7 +100,7 @@ jobs:
   docker-amd64:
     name: Docker Validator (amd64)
     runs-on: ubuntu-latest
-    needs: [unit, integration, e2e]
+    needs: [tests, security-scan]
     timeout-minutes: 15
     permissions:
       contents: read
@@ -177,7 +133,7 @@ jobs:
   docker-arm64:
     name: Docker Validator (arm64)
     runs-on: ubuntu-24.04-arm
-    needs: [unit, integration, e2e]
+    needs: [tests, security-scan]
     timeout-minutes: 15
     permissions:
       contents: read
