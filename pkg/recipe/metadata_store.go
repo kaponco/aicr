@@ -102,6 +102,12 @@ func loadMetadataStore(_ context.Context) (*MetadataStore, error) {
 				return eidoserrors.Wrap(eidoserrors.ErrCodeInvalidRequest, fmt.Sprintf("failed to parse %s", path), parseErr)
 			}
 
+			// Validate kind field
+			if metadata.Kind != "" && metadata.Kind != RecipeMetadataKind {
+				return eidoserrors.New(eidoserrors.ErrCodeInvalidRequest,
+					fmt.Sprintf("invalid kind in %s: got %q, expected %q", path, metadata.Kind, RecipeMetadataKind))
+			}
+
 			// Categorize as base or overlay
 			// base.yaml is now in overlays/ directory but still identified by filename
 			if filename == "base.yaml" && strings.Contains(path, "overlays/") {
@@ -287,8 +293,8 @@ func finalizeRecipeResult(criteria *Criteria, mergedSpec *RecipeMetadataSpec, ap
 	applyRegistryDefaults(mergedSpec.ComponentRefs)
 
 	result := &RecipeResult{
-		Kind:            "recipeResult",
-		APIVersion:      "eidos.nvidia.com/v1alpha1",
+		Kind:            RecipeResultKind,
+		APIVersion:      RecipeAPIVersion,
 		Criteria:        criteria,
 		Constraints:     mergedSpec.Constraints,
 		ComponentRefs:   mergedSpec.ComponentRefs,

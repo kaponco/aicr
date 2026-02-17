@@ -544,7 +544,7 @@ func ParseCriteriaFromValues(values url.Values) (*Criteria, error) {
 }
 
 // RecipeCriteriaKind is the kind value for RecipeCriteria resources.
-const RecipeCriteriaKind = "recipeCriteria"
+const RecipeCriteriaKind = "RecipeCriteria"
 
 // RecipeCriteriaAPIVersion is the API version for RecipeCriteria resources.
 const RecipeCriteriaAPIVersion = "eidos.nvidia.com/v1alpha1"
@@ -554,7 +554,7 @@ const RecipeCriteriaAPIVersion = "eidos.nvidia.com/v1alpha1"
 //
 // Example:
 //
-//	kind: recipeCriteria
+//	kind: RecipeCriteria
 //	apiVersion: eidos.nvidia.com/v1alpha1
 //	metadata:
 //	  name: gb200-eks-ubuntu-training
@@ -564,7 +564,7 @@ const RecipeCriteriaAPIVersion = "eidos.nvidia.com/v1alpha1"
 //	  accelerator: gb200
 //	  intent: training
 type RecipeCriteria struct {
-	// Kind is always "recipeCriteria".
+	// Kind is always "RecipeCriteria".
 	Kind string `json:"kind" yaml:"kind"`
 
 	// APIVersion is the API version (e.g., "eidos.nvidia.com/v1alpha1").
@@ -659,7 +659,7 @@ func validateAndConvertRawSpec(raw *rawCriteriaSpec) (*Criteria, error) {
 //
 // Example file (YAML):
 //
-//	kind: recipeCriteria
+//	kind: RecipeCriteria
 //	apiVersion: eidos.nvidia.com/v1alpha1
 //	metadata:
 //	  name: gb200-eks-ubuntu-training
@@ -698,7 +698,7 @@ func LoadCriteriaFromFile(path string) (*Criteria, error) {
 // Example JSON body:
 //
 //	{
-//	  "kind": "recipeCriteria",
+//	  "kind": "RecipeCriteria",
 //	  "apiVersion": "eidos.nvidia.com/v1alpha1",
 //	  "metadata": {"name": "my-criteria"},
 //	  "spec": {"service": "eks", "accelerator": "h100"}
