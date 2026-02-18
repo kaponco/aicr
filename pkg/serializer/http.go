@@ -70,32 +70,23 @@ var (
 // HTTPReaderOption defines a configuration option for HTTPReader.
 type HTTPReaderOption func(*HTTPReader)
 
+// ptr is a helper to create a pointer to a value.
+func ptr[T any](v T) *T { return &v }
+
 // HTTPReader handles fetching data over HTTP with configurable options.
 type HTTPReader struct {
 	UserAgent             string
-	TotalTimeout          time.Duration
-	ConnectTimeout        time.Duration
-	TLSHandshakeTimeout   time.Duration
-	ResponseHeaderTimeout time.Duration
-	IdleConnTimeout       time.Duration
-	MaxIdleConns          int
-	MaxIdleConnsPerHost   int
-	MaxConnsPerHost       int
-	InsecureSkipVerify    bool
+	TotalTimeout          *time.Duration
+	ConnectTimeout        *time.Duration
+	TLSHandshakeTimeout   *time.Duration
+	ResponseHeaderTimeout *time.Duration
+	IdleConnTimeout       *time.Duration
+	MaxIdleConns          *int
+	MaxIdleConnsPerHost   *int
+	MaxConnsPerHost       *int
+	InsecureSkipVerify    *bool
 	Client                *http.Client
 	transport             *http.Transport
-
-	// Track which knobs were explicitly set via options so we don't
-	// accidentally override caller-provided *http.Client defaults.
-	totalTimeoutSet          bool
-	connectTimeoutSet        bool
-	tlsHandshakeTimeoutSet   bool
-	responseHeaderTimeoutSet bool
-	idleConnTimeoutSet       bool
-	maxIdleConnsSet          bool
-	maxIdleConnsPerHostSet   bool
-	maxConnsPerHostSet       bool
-	insecureSkipVerifySet    bool
 }
 
 func WithUserAgent(userAgent string) HTTPReaderOption {
@@ -106,64 +97,55 @@ func WithUserAgent(userAgent string) HTTPReaderOption {
 
 func WithTotalTimeout(timeout time.Duration) HTTPReaderOption {
 	return func(r *HTTPReader) {
-		r.TotalTimeout = timeout
-		r.totalTimeoutSet = true
+		r.TotalTimeout = &timeout
 	}
 }
 
 func WithConnectTimeout(timeout time.Duration) HTTPReaderOption {
 	return func(r *HTTPReader) {
-		r.ConnectTimeout = timeout
-		r.connectTimeoutSet = true
+		r.ConnectTimeout = &timeout
 	}
 }
 
 func WithTLSHandshakeTimeout(timeout time.Duration) HTTPReaderOption {
 	return func(r *HTTPReader) {
-		r.TLSHandshakeTimeout = timeout
-		r.tlsHandshakeTimeoutSet = true
+		r.TLSHandshakeTimeout = &timeout
 	}
 }
 
 func WithResponseHeaderTimeout(timeout time.Duration) HTTPReaderOption {
 	return func(r *HTTPReader) {
-		r.ResponseHeaderTimeout = timeout
-		r.responseHeaderTimeoutSet = true
+		r.ResponseHeaderTimeout = &timeout
 	}
 }
 
 func WithIdleConnTimeout(timeout time.Duration) HTTPReaderOption {
 	return func(r *HTTPReader) {
-		r.IdleConnTimeout = timeout
-		r.idleConnTimeoutSet = true
+		r.IdleConnTimeout = &timeout
 	}
 }
 
 func WithMaxIdleConns(max int) HTTPReaderOption {
 	return func(r *HTTPReader) {
-		r.MaxIdleConns = max
-		r.maxIdleConnsSet = true
+		r.MaxIdleConns = &max
 	}
 }
 
 func WithMaxIdleConnsPerHost(max int) HTTPReaderOption {
 	return func(r *HTTPReader) {
-		r.MaxIdleConnsPerHost = max
-		r.maxIdleConnsPerHostSet = true
+		r.MaxIdleConnsPerHost = &max
 	}
 }
 
 func WithMaxConnsPerHost(max int) HTTPReaderOption {
 	return func(r *HTTPReader) {
-		r.MaxConnsPerHost = max
-		r.maxConnsPerHostSet = true
+		r.MaxConnsPerHost = &max
 	}
 }
 
 func WithInsecureSkipVerify(skip bool) HTTPReaderOption {
 	return func(r *HTTPReader) {
-		r.InsecureSkipVerify = skip
-		r.insecureSkipVerifySet = true
+		r.InsecureSkipVerify = &skip
 	}
 }
 
@@ -178,17 +160,8 @@ func NewHTTPReader(options ...HTTPReaderOption) *HTTPReader {
 	t := newDefaultHTTPTransport()
 
 	r := &HTTPReader{
-		UserAgent:             HTTPReaderUserAgent,
-		TotalTimeout:          HTTPReaderDefaultTimeout,
-		ConnectTimeout:        HTTPReaderDefaultConnectTimeout,
-		TLSHandshakeTimeout:   HTTPReaderDefaultTLSHandshakeTimeout,
-		ResponseHeaderTimeout: HTTPReaderDefaultResponseHeaderTimeout,
-		IdleConnTimeout:       HTTPReaderDefaultIdleConnTimeout,
-		MaxIdleConns:          HTTPReaderDefaultMaxIdleConns,
-		MaxIdleConnsPerHost:   HTTPReaderDefaultMaxIdleConnsPerHost,
-		MaxConnsPerHost:       HTTPReaderDefaultMaxConnsPerHost,
-		InsecureSkipVerify:    false,
-		transport:             t,
+		UserAgent: HTTPReaderUserAgent,
+		transport: t,
 		Client: &http.Client{
 			Timeout:   HTTPReaderDefaultTimeout,
 			Transport: t,
@@ -244,16 +217,46 @@ func (r *HTTPReader) apply() {
 		r.UserAgent = HTTPReaderUserAgent
 	}
 
+	// Track whether TotalTimeout was explicitly set
+	totalTimeoutWasSet := r.TotalTimeout != nil
+
+	// Apply defaults for unset options
+	if r.TotalTimeout == nil {
+		r.TotalTimeout = ptr(HTTPReaderDefaultTimeout)
+	}
+	if r.ConnectTimeout == nil {
+		r.ConnectTimeout = ptr(HTTPReaderDefaultConnectTimeout)
+	}
+	if r.TLSHandshakeTimeout == nil {
+		r.TLSHandshakeTimeout = ptr(HTTPReaderDefaultTLSHandshakeTimeout)
+	}
+	if r.ResponseHeaderTimeout == nil {
+		r.ResponseHeaderTimeout = ptr(HTTPReaderDefaultResponseHeaderTimeout)
+	}
+	if r.IdleConnTimeout == nil {
+		r.IdleConnTimeout = ptr(HTTPReaderDefaultIdleConnTimeout)
+	}
+	if r.MaxIdleConns == nil {
+		r.MaxIdleConns = ptr(HTTPReaderDefaultMaxIdleConns)
+	}
+	if r.MaxIdleConnsPerHost == nil {
+		r.MaxIdleConnsPerHost = ptr(HTTPReaderDefaultMaxIdleConnsPerHost)
+	}
+	if r.MaxConnsPerHost == nil {
+		r.MaxConnsPerHost = ptr(HTTPReaderDefaultMaxConnsPerHost)
+	}
+	if r.InsecureSkipVerify == nil {
+		r.InsecureSkipVerify = ptr(false)
+	}
+
 	if r.Client == nil {
 		// Preserve behavior: if caller nils out the client, recreate a safe default.
 		t := newDefaultHTTPTransport()
 		r.transport = t
-		r.Client = &http.Client{Timeout: HTTPReaderDefaultTimeout, Transport: t}
-	}
-
-	// Apply client timeout only if explicitly set.
-	if r.totalTimeoutSet && r.TotalTimeout > 0 {
-		r.Client.Timeout = r.TotalTimeout
+		r.Client = &http.Client{Timeout: *r.TotalTimeout, Transport: t}
+	} else if totalTimeoutWasSet {
+		// Only override client timeout if TotalTimeout was explicitly set
+		r.Client.Timeout = *r.TotalTimeout
 	}
 
 	// If caller supplied a custom client, we can only apply transport-related options
@@ -264,31 +267,31 @@ func (r *HTTPReader) apply() {
 	}
 
 	// Pooling
-	if r.maxIdleConnsSet && r.MaxIdleConns > 0 {
-		tr.MaxIdleConns = r.MaxIdleConns
+	if *r.MaxIdleConns > 0 {
+		tr.MaxIdleConns = *r.MaxIdleConns
 	}
-	if r.maxIdleConnsPerHostSet && r.MaxIdleConnsPerHost > 0 {
-		tr.MaxIdleConnsPerHost = r.MaxIdleConnsPerHost
+	if *r.MaxIdleConnsPerHost > 0 {
+		tr.MaxIdleConnsPerHost = *r.MaxIdleConnsPerHost
 	}
-	if r.maxConnsPerHostSet && r.MaxConnsPerHost > 0 {
-		tr.MaxConnsPerHost = r.MaxConnsPerHost
+	if *r.MaxConnsPerHost > 0 {
+		tr.MaxConnsPerHost = *r.MaxConnsPerHost
 	}
 
 	// Timeouts
-	if r.connectTimeoutSet && r.ConnectTimeout > 0 {
+	if *r.ConnectTimeout > 0 {
 		tr.DialContext = (&net.Dialer{
-			Timeout:   r.ConnectTimeout,
+			Timeout:   *r.ConnectTimeout,
 			KeepAlive: HTTPReaderDefaultKeepAlive,
 		}).DialContext
 	}
-	if r.tlsHandshakeTimeoutSet && r.TLSHandshakeTimeout > 0 {
-		tr.TLSHandshakeTimeout = r.TLSHandshakeTimeout
+	if *r.TLSHandshakeTimeout > 0 {
+		tr.TLSHandshakeTimeout = *r.TLSHandshakeTimeout
 	}
-	if r.responseHeaderTimeoutSet && r.ResponseHeaderTimeout > 0 {
-		tr.ResponseHeaderTimeout = r.ResponseHeaderTimeout
+	if *r.ResponseHeaderTimeout > 0 {
+		tr.ResponseHeaderTimeout = *r.ResponseHeaderTimeout
 	}
-	if r.idleConnTimeoutSet && r.IdleConnTimeout > 0 {
-		tr.IdleConnTimeout = r.IdleConnTimeout
+	if *r.IdleConnTimeout > 0 {
+		tr.IdleConnTimeout = *r.IdleConnTimeout
 	}
 
 	// TLS
@@ -296,16 +299,14 @@ func (r *HTTPReader) apply() {
 		tr.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	}
 	tr.TLSClientConfig.MinVersion = tls.VersionTLS12
-	if r.insecureSkipVerifySet {
-		tr.TLSClientConfig.InsecureSkipVerify = r.InsecureSkipVerify
-	}
+	tr.TLSClientConfig.InsecureSkipVerify = *r.InsecureSkipVerify
 }
 
 // Read fetches data from the specified URL and returns it as a byte slice.
 // The request is bounded by the HTTPReader's TotalTimeout.
 // Use ReadWithContext for caller-controlled cancellation.
 func (r *HTTPReader) Read(url string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), r.TotalTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), *r.TotalTimeout)
 	defer cancel()
 	return r.ReadWithContext(ctx, url)
 }
@@ -352,7 +353,7 @@ func (r *HTTPReader) ReadWithContext(ctx context.Context, url string) ([]byte, e
 // The request is bounded by the HTTPReader's TotalTimeout.
 // Use DownloadWithContext for caller-controlled cancellation.
 func (r *HTTPReader) Download(url, filePath string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), r.TotalTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), *r.TotalTimeout)
 	defer cancel()
 	return r.DownloadWithContext(ctx, url, filePath)
 }

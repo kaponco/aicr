@@ -220,20 +220,20 @@ func TestNewHTTPReader_WithOptions(t *testing.T) {
 		t.Errorf("expected UserAgent %s, got %s", customUserAgent, reader.UserAgent)
 	}
 
-	if reader.InsecureSkipVerify != true {
+	if *reader.InsecureSkipVerify != true {
 		t.Error("expected InsecureSkipVerify to be true")
 	}
 
-	if reader.MaxIdleConns != 50 {
-		t.Errorf("expected MaxIdleConns 50, got %d", reader.MaxIdleConns)
+	if *reader.MaxIdleConns != 50 {
+		t.Errorf("expected MaxIdleConns 50, got %v", reader.MaxIdleConns)
 	}
 
-	if reader.MaxIdleConnsPerHost != 5 {
-		t.Errorf("expected MaxIdleConnsPerHost 5, got %d", reader.MaxIdleConnsPerHost)
+	if *reader.MaxIdleConnsPerHost != 5 {
+		t.Errorf("expected MaxIdleConnsPerHost 5, got %v", reader.MaxIdleConnsPerHost)
 	}
 
-	if reader.MaxConnsPerHost != 10 {
-		t.Errorf("expected MaxConnsPerHost 10, got %d", reader.MaxConnsPerHost)
+	if *reader.MaxConnsPerHost != 10 {
+		t.Errorf("expected MaxConnsPerHost 10, got %v", reader.MaxConnsPerHost)
 	}
 
 	tr, ok := reader.Client.Transport.(*http.Transport)
@@ -286,23 +286,23 @@ func TestHTTPReader_TimeoutOptions(t *testing.T) {
 		WithIdleConnTimeout(idleTimeout),
 	)
 
-	if reader.TotalTimeout != totalTimeout {
+	if *reader.TotalTimeout != totalTimeout {
 		t.Errorf("TotalTimeout = %v, want %v", reader.TotalTimeout, totalTimeout)
 	}
 
-	if reader.ConnectTimeout != connectTimeout {
+	if *reader.ConnectTimeout != connectTimeout {
 		t.Errorf("ConnectTimeout = %v, want %v", reader.ConnectTimeout, connectTimeout)
 	}
 
-	if reader.TLSHandshakeTimeout != tlsTimeout {
+	if *reader.TLSHandshakeTimeout != tlsTimeout {
 		t.Errorf("TLSHandshakeTimeout = %v, want %v", reader.TLSHandshakeTimeout, tlsTimeout)
 	}
 
-	if reader.ResponseHeaderTimeout != headerTimeout {
+	if *reader.ResponseHeaderTimeout != headerTimeout {
 		t.Errorf("ResponseHeaderTimeout = %v, want %v", reader.ResponseHeaderTimeout, headerTimeout)
 	}
 
-	if reader.IdleConnTimeout != idleTimeout {
+	if *reader.IdleConnTimeout != idleTimeout {
 		t.Errorf("IdleConnTimeout = %v, want %v", reader.IdleConnTimeout, idleTimeout)
 	}
 

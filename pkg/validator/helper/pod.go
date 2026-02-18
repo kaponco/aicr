@@ -17,7 +17,6 @@ package helper
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -99,87 +98,53 @@ func (p *PodLifecycle) WaitForPodByName(ctx context.Context, podName string, tim
 
 // WaitForPodSuccess waits for a pod to reach Succeeded phase
 func (p *PodLifecycle) WaitForPodSuccess(ctx context.Context, pod *v1.Pod, timeout time.Duration) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	p.T.Logf("Waiting for pod %s to reach Succeeded state...", pod.Name)
 
-	// Poll the pod status instead of using the framework's wait condition
-	ticker := time.NewTicker(defaults.PodPollInterval)
-	defer ticker.Stop()
+	// Use watch API for efficient monitoring
+	watcher, err := p.ClientSet.CoreV1().Pods(pod.Namespace).Watch(
+		timeoutCtx,
+		metav1.ListOptions{
+			FieldSelector: "metadata.name=" + pod.Name,
+		},
+	)
+	if err != nil {
+		return eidosErrors.Wrap(eidosErrors.ErrCodeInternal, "failed to watch pod", err)
+	}
+	defer watcher.Stop()
 
 	for {
 		select {
-		case <-ctx.Done():
-			// Get current pod state for error message using a fresh, short-lived context
-			diagCtx, diagCancel := context.WithTimeout(context.Background(), defaults.CollectorTimeout)
-			defer diagCancel()
-
-			//nolint:contextcheck // intentionally using a fresh context for diagnostics after parent timeout
-			foundPod, err := p.ClientSet.CoreV1().Pods(p.Namespace).Get(diagCtx, pod.Name, metav1.GetOptions{})
-			if err != nil {
-				return eidosErrors.Wrap(eidosErrors.ErrCodeTimeout, "timed out waiting for pod to succeed, and failed to get current state", err)
+		case <-timeoutCtx.Done():
+			return eidosErrors.Wrap(eidosErrors.ErrCodeTimeout, "pod wait timeout", timeoutCtx.Err())
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				return eidosErrors.New(eidosErrors.ErrCodeInternal, "watch channel closed unexpectedly")
 			}
 
-			// Provide detailed information about why it failed
-			phase := foundPod.Status.Phase
-			reason := foundPod.Status.Reason
-			message := foundPod.Status.Message
-
-			var containerStatuses []string
-			for _, cs := range foundPod.Status.ContainerStatuses {
-				switch {
-				case cs.State.Waiting != nil:
-					containerStatuses = append(containerStatuses, fmt.Sprintf("%s: Waiting (%s: %s)",
-						cs.Name, cs.State.Waiting.Reason, cs.State.Waiting.Message))
-				case cs.State.Running != nil:
-					containerStatuses = append(containerStatuses, fmt.Sprintf("%s: Running", cs.Name))
-				case cs.State.Terminated != nil:
-					containerStatuses = append(containerStatuses, fmt.Sprintf("%s: Terminated (exit code: %d, reason: %s)",
-						cs.Name, cs.State.Terminated.ExitCode, cs.State.Terminated.Reason))
-				}
-			}
-
-			errorMsg := fmt.Sprintf("timed out waiting for pod %s to succeed after %v. Current state: Phase=%s",
-				pod.Name, timeout, phase)
-			if reason != "" {
-				errorMsg += fmt.Sprintf(", Reason=%s", reason)
-			}
-			if message != "" {
-				errorMsg += fmt.Sprintf(", Message=%s", message)
-			}
-			if len(containerStatuses) > 0 {
-				errorMsg += fmt.Sprintf(", Container statuses: [%s]", strings.Join(containerStatuses, "; "))
-			}
-
-			return eidosErrors.New(eidosErrors.ErrCodeTimeout, errorMsg)
-
-		case <-ticker.C:
-			foundPod, err := p.ClientSet.CoreV1().Pods(p.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-			if err != nil {
-				p.T.Logf("Failed to get pod status: %v", err)
+			watchedPod, ok := event.Object.(*v1.Pod)
+			if !ok {
 				continue
 			}
 
-			p.T.Logf("Pod %s current phase: %s", pod.Name, foundPod.Status.Phase)
+			p.T.Logf("Pod %s current phase: %s", watchedPod.Name, watchedPod.Status.Phase)
 
-			if foundPod.Status.Phase == v1.PodSucceeded {
-				p.T.Logf("Pod %s successfully completed", pod.Name)
+			// Check for success
+			if watchedPod.Status.Phase == v1.PodSucceeded {
+				p.T.Logf("Pod %s successfully completed", watchedPod.Name)
 				return nil
 			}
 
-			// If pod failed, return immediately with error
-			if foundPod.Status.Phase == v1.PodFailed {
-				reason := foundPod.Status.Reason
-				message := foundPod.Status.Message
-				errorMsg := fmt.Sprintf("pod %s failed", pod.Name)
-				if reason != "" {
-					errorMsg += fmt.Sprintf(" (reason: %s)", reason)
-				}
-				if message != "" {
-					errorMsg += fmt.Sprintf(" (message: %s)", message)
-				}
-				return eidosErrors.New(eidosErrors.ErrCodeInternal, errorMsg)
+			// Check for failure
+			if watchedPod.Status.Phase == v1.PodFailed {
+				return eidosErrors.NewWithContext(eidosErrors.ErrCodeInternal, "pod failed", map[string]interface{}{
+					"namespace": watchedPod.Namespace,
+					"name":      watchedPod.Name,
+					"reason":    watchedPod.Status.Reason,
+					"message":   watchedPod.Status.Message,
+				})
 			}
 		}
 	}
