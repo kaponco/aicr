@@ -1,4 +1,4 @@
-# Eidos End-to-End Demo
+# End-to-End Demo
 
 > Run from inside of the repo
 
