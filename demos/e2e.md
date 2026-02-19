@@ -10,7 +10,17 @@ Clean up prior state:
 rm -rf ./bundle recipe.yaml /tmp/eidos-unpacked
 ```
 
+## Commands
+
+```shell
+eidos
+```
+
 ## Recipe
+
+```shell
+eidos recipe -h
+```
 
 Basic (parameters via flags):
 
