@@ -60,6 +60,12 @@ coverage.xml
 digests.txt
 images.json
 
+# Demos
+demos/images/*local.png
+demos/*local.md
+bundle.zip
+image-oci
+
 # =============================================================================
 # Terraform
 # =============================================================================

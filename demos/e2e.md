@@ -1,43 +1,55 @@
 # Eidos End-to-End Demo
 
-## Recipe
+> Run from inside of the repo
 
-Basic (query parameters):
+## Setup
+
+Clean up prior state: 
 
 ```shell
-eidos recipe \
-  --service eks \
-  --accelerator gb200 \
-  --os ubuntu \
-  --intent training \
-  --platform kubeflow | yq .
+rm -rf ./bundle recipe.yaml /tmp/eidos-unpacked
+```
+
+## Recipe
+
+Basic (parameters via flags):
+
+```shell
+eidos recipe --service eks --accelerator gb200 | yq .
 ```
 
 From criteria file:
 
 ```shell
-# Create criteria file
 cat > /tmp/criteria.yaml << 'EOF'
 kind: RecipeCriteria
 apiVersion: eidos.nvidia.com/v1alpha1
 metadata:
-  name: gb200-eks-training
+  name: h100-eks-training-kubeflow
 spec:
   service: eks
-  accelerator: gb200
+  accelerator: h100
   os: ubuntu
   intent: training
   platform: kubeflow
 EOF
+```
 
-# Generate recipe from criteria file
-eidos recipe --criteria /tmp/criteria.yaml | yq .
+Generate recipe from criteria file
 
-# CLI flags override criteria file values
+```shell
+eidos recipe --criteria /tmp/criteria.yaml --output recipe.yaml
+```
+
+> Metadata overlays: `components=11 overlays=7`
+
+CLI flags override criteria file values
+
+```shell
 eidos recipe --criteria /tmp/criteria.yaml --service gke | yq .
 ```
 
-Metadata overlays: `components=5 overlays=5`
+> Metadata overlays: `components=7 overlays=2`
 
 ![data flow](images/recipe.png)
 
@@ -68,7 +80,9 @@ Allowed list support in self-hosted API:
 curl -s "https://eidos.dgxc.io/v1/recipe?service=eks&accelerator=l40&intent=training" | jq .
 ```
 
-Make Snapshot: 
+# Snapshot
+
+> Requires auth'd cluster
 
 ```shell
 eidos snapshot \
@@ -90,8 +104,7 @@ Recipe from Snapshot:
 eidos recipe \
   --snapshot cm://gpu-operator/eidos-snapshot \
   --intent training \
-  --platform kubeflow \
-  --output recipe.yaml
+  --platform kubeflow | yq .
 ```
 
 Recipe Constraints:
@@ -105,16 +118,8 @@ Validate Recipe:
 ```shell
 eidos validate \
   --recipe recipe.yaml \
-  --namespace gpu-operator \
+  --require-gpu \
   --snapshot cm://gpu-operator/eidos-snapshot | yq .
-```
-
-Validate Recipe sans Snapshot
-
-```shell
-eidos validate \
-  --recipe recipe.yaml \
-  --node-selector nodeGroup=customer-gpu
 ```
 
 ## Bundle
@@ -141,13 +146,7 @@ curl -s "https://eidos.dgxc.io/v1/recipe?service=eks&accelerator=h100&intent=tra
 Navigate into the bundle:
 
 ```shell
-cd ./bundle
-```
-
-Check bundle content: 
-
-```shell
-tree .
+cd ./bundle && tree .
 ```
 
 Review the checksums: 
@@ -184,12 +183,80 @@ Review manifest:
 crane manifest "ghcr.io/nvidia/eidos-bundle-example@$(cat .digest)" | jq .
 ```
 
+## Validate Cluster 
+
+```shell
+eidos validate \
+  --recipe recipe.yaml \
+  --require-gpu \
+  --phase all
+```
+
+## Embedded Data
+
+View embedded data files structure:
+
+```shell
+cd ../ && tree -L 2 ./recipes/
+```
+
+## Runtime Data Support
+
+Need Teleport, add component: 
+
+```shell
+yq . examples/data/registry.yaml
+```
+
+Override existing recipe: 
+
+```shell
+yq . examples/data/overlays/dgxc-teleport.yaml
+```
+
+Generate recipe with external data:
+
+```shell
+eidos recipe \
+  --service eks \
+  --accelerator h100 \
+  --os ubuntu \
+  --intent training \
+  --data ./examples/data \
+  --output recipe.yaml
+```
+
+Output shows:
+* `18` embedded + `1` external = `19` merged components
+* `dgxc-teleport` appears as Kustomize component
+
+Now `dgxc-teleport` is included in `componentRefs` and `deploymentOrder`
+
+```shell
+yq . recipe.yaml
+```
+
+Now generate bundles:
+
+```shell
+eidos bundle \
+  --recipe recipe.yaml \
+  --data ./examples/data \
+  --deployer argocd \
+  --output oci://ghcr.io/nvidia/eidos-bundle-example \
+  --system-node-selector nodeGroup=system-pool \
+  --accelerated-node-selector nodeGroup=customer-gpu \
+  --accelerated-node-toleration nvidia.com/gpu=present:NoSchedule \
+  --image-refs .digest
+```
+
 Unpack the image: 
 
 ```shell
 skopeo copy "docker://ghcr.io/nvidia/eidos-bundle-example@$(cat .digest)" oci:image-oci
-mkdir -p ./eidos-unpacked
-oras pull --oci-layout "image-oci@$(cat .digest)" -o ./eidos-unpacked
+mkdir -p /tmp/eidos-unpacked
+oras pull --oci-layout "image-oci@$(cat .digest)" -o /tmp/eidos-unpacked
+tree /tmp/eidos-unpacked
 ```
 
 ## Links
@@ -197,3 +264,4 @@ oras pull --oci-layout "image-oci@$(cat .digest)" -o ./eidos-unpacked
 * [Installation Guide](https://github.com/NVIDIA/eidos/blob/main/docs/user/installation.md)
 * [CLI Reference](https://github.com/NVIDIA/eidos/blob/main/docs/user/cli-reference.md)
 * [API Reference](https://github.com/NVIDIA/eidos/blob/main/docs/user/api-reference.md)
+* [Data Reference](https://github.com/NVIDIA/eidos/blob/main/recipes/README.md)
