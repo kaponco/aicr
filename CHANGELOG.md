@@ -2,6 +2,69 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.4] - 2026-02-21
+
+### Bug Fixes
+
+- *(ci)* Re-enable CDI for H100 kind smoke test  by [@dims](https://github.com/dims)
+- Update inference stack versions and enable Grove for dynamo workloads  by [@yuanchen8911](https://github.com/yuanchen8911)
+- *(ci)* Harden workflows and improve CI/CD hygiene by [@mchmarny](https://github.com/mchmarny)
+- *(ci)* Use pull_request_target for write-permission workflows by [@mchmarny](https://github.com/mchmarny)
+- *(ci)* Break long lines in welcome workflow to pass yamllint  by [@dims](https://github.com/dims)
+- Remove admission.cdi from kai-scheduler values  by [@yuanchen8911](https://github.com/yuanchen8911)
+- *(ci)* Add pull_request trigger to vuln-scan workflow by [@mchmarny](https://github.com/mchmarny)
+- Enable DCGM exporter ServiceMonitor for Prometheus scraping  by [@yuanchen8911](https://github.com/yuanchen8911)
+- *(ci)* Combine path and size label workflows to prevent race condition  by [@yuanchen8911](https://github.com/yuanchen8911)
+- Add markdown rendering to chat UI and update CUJ2 documentation  by [@yuanchen8911](https://github.com/yuanchen8911)
+- Add kube-prometheus-stack as gpu-operator dependency  by [@yuanchen8911](https://github.com/yuanchen8911)
+- Skip --wait for KAI scheduler in deploy script  by [@yuanchen8911](https://github.com/yuanchen8911)
+- *(ci)* Lower vuln scan threshold to MEDIUM and add container image scanning  by [@dims](https://github.com/dims)
+- *(docs)* Update bundle commands with correct tolerations in CUJ demos  by [@yuanchen8911](https://github.com/yuanchen8911)
+- *(ci)* Run attestation and vuln scan concurrently in release workflow  by [@dims](https://github.com/dims)
+- Remove trailing quote from skyhook no-op package version  by [@yuanchen8911](https://github.com/yuanchen8911)
+- Remove nodeSelector from EBS CSI node DaemonSet scheduling  by [@yuanchen8911](https://github.com/yuanchen8911)
+- Move DRA controller nodeAffinity override to EKS overlay  by [@yuanchen8911](https://github.com/yuanchen8911)
+- *(ci)* Use PR number in KWOK concurrency group by [@mchmarny](https://github.com/mchmarny)
+
+### Features
+
+- *(ci)* Add OSS community automation workflows by [@mchmarny](https://github.com/mchmarny)
+- Add CUJ2 inference demo chat UI and update CUJ2 instructions  by [@yuanchen8911](https://github.com/yuanchen8911)
+- Add DRA and gang scheduling test manifests for CNCF AI conformance  by [@yuanchen8911](https://github.com/yuanchen8911)
+- *(ci)* Collect AI conformance evidence in H100 smoke test  by [@dims](https://github.com/dims)
+- *(ci)* Add DRA GPU allocation test to H100 smoke test  by [@dims](https://github.com/dims)
+- Add expected-resources deployment check for validating Kubernetes resources exist  by [@xdu31](https://github.com/xdu31)
+- Add CNCF AI Conformance evidence collection   by [@yuanchen8911](https://github.com/yuanchen8911)
+- *(skyhook)* Temporarily remove skyhook tuning due to bugs  by [@ayuskauskas](https://github.com/ayuskauskas)
+- Add GPU training CI workflow with gang scheduling test  by [@dims](https://github.com/dims)
+- *(ci)* Add CNCF AI conformance validations to inference workflow  by [@dims](https://github.com/dims)
+- *(ci)* Add HPA pod autoscaling validation to inference workflow  by [@dims](https://github.com/dims)
+- *(ci)* Add ClamAV malware scanning GitHub Action  by [@dims](https://github.com/dims)
+- Add two-phase expected resource auto-discovery to validator  by [@xdu31](https://github.com/xdu31)
+- Add support for workload-gate and workload-selector  by [@ayuskauskas](https://github.com/ayuskauskas)
+
+### Other
+
+- Eidos → aicr (AI Cluster Runtime) by [@mchmarny](https://github.com/mchmarny)
+
+### Refactor
+
+- Move examples/demos to project root demos directory by [@mchmarny](https://github.com/mchmarny)
+- Move kai-scheduler and DRA driver to base overlay for CNCF AI conformance  by [@yuanchen8911](https://github.com/yuanchen8911)
+- Rename PreDeployment to Readiness across codebase and docs  by [@xdu31](https://github.com/xdu31)
+
+### Tasks
+
+- Update demos by [@mchmarny](https://github.com/mchmarny)
+- Update s3c demo by [@mchmarny](https://github.com/mchmarny)
+- Update demos by [@mchmarny](https://github.com/mchmarny)
+- Update e2e demo by [@mchmarny](https://github.com/mchmarny)
+- Update e2e demo by [@mchmarny](https://github.com/mchmarny)
+- Update e2e demo by [@mchmarny](https://github.com/mchmarny)
+- Update e2e demo by [@mchmarny](https://github.com/mchmarny)
+- Improve consistency across GPU CI workflows  by [@dims](https://github.com/dims)
+- Update cuj1 by [@mchmarny](https://github.com/mchmarny)
+
 ## [0.7.3] - 2026-02-18
 
 ### Bug Fixes
