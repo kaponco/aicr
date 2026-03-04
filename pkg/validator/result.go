@@ -138,7 +138,8 @@ type PhaseResult struct {
 	// Checks contains results of named validation checks.
 	Checks []CheckResult `json:"checks,omitempty" yaml:"checks,omitempty"`
 
-	// Components contains per-component materialization results for this phase.
+	// Components is retained for backward-compatible deserialization of older results.
+	// No longer populated; per-component health is validated via Chainsaw health checks.
 	Components []ComponentResult `json:"components,omitempty" yaml:"components,omitempty"`
 
 	// Reason explains why the phase was skipped or failed.
@@ -170,7 +171,7 @@ type CheckResult struct {
 	Artifacts []checks.Artifact `json:"-" yaml:"-"`
 }
 
-// ComponentResult represents the materialization status of a single recipe component.
+// ComponentResult is retained for backward-compatible deserialization of older results.
 type ComponentResult struct {
 	// Name is the component identifier (e.g., "gpu-operator").
 	Name string `json:"name" yaml:"name"`
@@ -178,7 +179,7 @@ type ComponentResult struct {
 	// Type is the component type (e.g., "helm", "kustomize").
 	Type string `json:"type" yaml:"type"`
 
-	// Status is the materialization outcome.
+	// Status is the outcome.
 	Status ValidationStatus `json:"status" yaml:"status"`
 
 	// Expected captures the recipe's intended deployment configuration.

@@ -43,14 +43,6 @@ func WithSystemDServices(services []string) Option {
 	}
 }
 
-// WithHelmNamespaces configures the namespaces for Helm release collection.
-// nil/empty = skip, ["*"] = all namespaces, ["ns1","ns2"] = scoped.
-func WithHelmNamespaces(namespaces []string) Option {
-	return func(f *DefaultFactory) {
-		f.HelmNamespaces = namespaces
-	}
-}
-
 // WithMaxNodesPerEntry configures the maximum number of node names stored per
 // taint/label entry in the topology collector. 0 = no limit.
 func WithMaxNodesPerEntry(max int) Option {
@@ -63,7 +55,6 @@ func WithMaxNodesPerEntry(max int) Option {
 // with production dependencies. It configures default systemd services to monitor.
 type DefaultFactory struct {
 	SystemDServices  []string
-	HelmNamespaces   []string
 	MaxNodesPerEntry int
 }
 
@@ -106,9 +97,7 @@ func (f *DefaultFactory) CreateOSCollector() Collector {
 
 // CreateKubernetesCollector creates a Kubernetes API collector.
 func (f *DefaultFactory) CreateKubernetesCollector() Collector {
-	return &k8s.Collector{
-		HelmNamespaces: f.HelmNamespaces,
-	}
+	return &k8s.Collector{}
 }
 
 // CreateNodeTopologyCollector creates a node topology collector that gathers

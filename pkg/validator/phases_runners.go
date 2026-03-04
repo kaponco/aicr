@@ -94,7 +94,7 @@ func (v *Validator) validateReadiness(
 }
 
 // validateDeployment validates deployment phase.
-// Compares recipe components against snapshot (materialization), then runs checks as Kubernetes Jobs.
+// Runs checks as Kubernetes Jobs to verify deployment constraints.
 //
 //nolint:unparam,dupl // error always nil; phase validation methods have similar structure by design
 func (v *Validator) validateDeployment(
@@ -112,9 +112,6 @@ func (v *Validator) validateDeployment(
 		Constraints: []ConstraintValidation{},
 		Checks:      []CheckResult{},
 	}
-
-	// Component materialization check (snapshot-based, no cluster needed)
-	phaseResult.Components = compareComponentsAgainstSnapshot(recipeResult, snap)
 
 	// Check if deployment phase is configured
 	if recipeResult.Validation == nil || recipeResult.Validation.Deployment == nil {
@@ -195,21 +192,11 @@ func (v *Validator) validateDeployment(
 		}
 	}
 
-	// Determine phase status based on checks AND components
+	// Determine phase status based on checks
 	failedCount := 0
 	passedCount := 0
 	for _, check := range phaseResult.Checks {
 		switch check.Status {
-		case ValidationStatusFail:
-			failedCount++
-		case ValidationStatusPass:
-			passedCount++
-		case ValidationStatusPartial, ValidationStatusSkipped, ValidationStatusWarning:
-			// Don't count these toward pass/fail
-		}
-	}
-	for _, comp := range phaseResult.Components {
-		switch comp.Status {
 		case ValidationStatusFail:
 			failedCount++
 		case ValidationStatusPass:
@@ -232,13 +219,12 @@ func (v *Validator) validateDeployment(
 	result.Summary.Status = phaseResult.Status
 	result.Summary.Passed = passedCount
 	result.Summary.Failed = failedCount
-	result.Summary.Total = len(phaseResult.Checks) + len(phaseResult.Components)
+	result.Summary.Total = len(phaseResult.Checks)
 	result.Summary.Duration = phaseResult.Duration
 
 	slog.Info("deployment validation completed",
 		"status", phaseResult.Status,
 		"checks", len(phaseResult.Checks),
-		"components", len(phaseResult.Components),
 		"duration", phaseResult.Duration)
 
 	return result, nil
