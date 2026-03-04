@@ -17,6 +17,7 @@ package validator
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -160,8 +161,19 @@ func (v *Validator) ValidatePhase(
 		}
 	}
 
-	// Run the requested phase (PhaseAll is handled by early return above)
-	switch phase { //nolint:exhaustive // PhaseAll handled above
+	return v.validatePhaseOnly(ctx, phase, recipeResult, snap)
+}
+
+// validatePhaseOnly dispatches to the phase runner without RBAC/ConfigMap setup.
+// Callers must ensure RBAC and ConfigMaps are already in place.
+func (v *Validator) validatePhaseOnly(
+	ctx context.Context,
+	phase ValidationPhaseName,
+	recipeResult *recipe.RecipeResult,
+	snap *snapshotter.Snapshot,
+) (*ValidationResult, error) {
+
+	switch phase { //nolint:exhaustive // PhaseAll handled by callers
 	case PhaseReadiness:
 		return v.validateReadiness(ctx, recipeResult, snap)
 	case PhaseDeployment:
@@ -193,10 +205,8 @@ func (v *Validator) ValidatePhases(
 	}
 
 	// Check if "all" is in the list - if so, just run all
-	for _, p := range phases {
-		if p == PhaseAll {
-			return v.validateAll(ctx, recipeResult, snap)
-		}
+	if slices.Contains(phases, PhaseAll) {
+		return v.validateAll(ctx, recipeResult, snap)
 	}
 
 	start := time.Now()
@@ -204,6 +214,40 @@ func (v *Validator) ValidatePhases(
 
 	result := NewValidationResult()
 	overallStatus := ValidationStatusPass
+
+	// Create RBAC and ConfigMaps once before the loop (matching validateAll pattern)
+	clientset, _, err := k8sclient.GetKubeClient()
+	if err == nil && !v.NoCluster {
+		sharedConfig := agent.Config{
+			Namespace:          v.Namespace,
+			ServiceAccountName: "aicr-validator",
+		}
+		deployer := agent.NewDeployer(clientset, sharedConfig)
+
+		if rbacErr := deployer.EnsureRBAC(ctx); rbacErr != nil {
+			slog.Debug("failed to create RBAC resources", "error", rbacErr)
+		} else if v.Cleanup {
+			//nolint:contextcheck // Using separate context for cleanup to avoid cancellation
+			defer func() {
+				cleanupCtx, cancel := context.WithTimeout(context.Background(), defaults.K8sCleanupTimeout)
+				defer cancel()
+				if cleanupErr := deployer.CleanupRBAC(cleanupCtx); cleanupErr != nil {
+					slog.Warn("failed to cleanup RBAC resources", "error", cleanupErr)
+				}
+			}()
+		}
+
+		if cmErr := v.ensureDataConfigMaps(ctx, clientset, snap, recipeResult); cmErr != nil {
+			slog.Warn("failed to create data ConfigMaps", "error", cmErr)
+		} else {
+			//nolint:contextcheck // Using separate context for cleanup to avoid cancellation
+			defer func() {
+				cleanupCtx, cancel := context.WithTimeout(context.Background(), defaults.K8sCleanupTimeout)
+				defer cancel()
+				v.cleanupDataConfigMaps(cleanupCtx, clientset)
+			}()
+		}
+	}
 
 	for _, phase := range phases {
 		select {
@@ -222,8 +266,8 @@ func (v *Validator) ValidatePhases(
 			continue
 		}
 
-		// Run the phase
-		phaseResultDoc, err := v.ValidatePhase(ctx, phase, recipeResult, snap)
+		// Run the phase (RBAC and ConfigMaps already exist)
+		phaseResultDoc, err := v.validatePhaseOnly(ctx, phase, recipeResult, snap)
 		if err != nil {
 			return nil, err
 		}

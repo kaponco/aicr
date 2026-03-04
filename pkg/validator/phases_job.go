@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/NVIDIA/aicr/pkg/defaults"
-	"github.com/NVIDIA/aicr/pkg/errors"
 	"github.com/NVIDIA/aicr/pkg/header"
 	k8sclient "github.com/NVIDIA/aicr/pkg/k8s/client"
 	"github.com/NVIDIA/aicr/pkg/recipe"
@@ -446,23 +445,7 @@ func (v *Validator) validateAll(
 		}
 
 		// Run the phase (RBAC already exists, phases will reuse it)
-		var phaseResultDoc *ValidationResult
-		var err error
-
-		switch phase {
-		case PhaseReadiness:
-			phaseResultDoc, err = v.validateReadiness(ctx, recipeResult, snap)
-		case PhaseDeployment:
-			phaseResultDoc, err = v.validateDeployment(ctx, recipeResult, snap)
-		case PhasePerformance:
-			phaseResultDoc, err = v.validatePerformance(ctx, recipeResult, snap)
-		case PhaseConformance:
-			phaseResultDoc, err = v.validateConformance(ctx, recipeResult, snap)
-		case PhaseAll:
-			// PhaseAll should never reach here as it's handled in ValidatePhase
-			return nil, errors.New(errors.ErrCodeInternal, "PhaseAll cannot be called within validateAll")
-		}
-
+		phaseResultDoc, err := v.validatePhaseOnly(ctx, phase, recipeResult, snap)
 		if err != nil {
 			return nil, err
 		}

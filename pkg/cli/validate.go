@@ -46,7 +46,6 @@ type validateAgentConfig struct {
 	timeout            time.Duration
 	cleanup            bool
 	debug              bool
-	privileged         bool
 	requireGPU         bool
 	helmNamespaces     []string
 	helmAllNamespaces  bool
@@ -76,7 +75,6 @@ func parseValidateAgentConfig(cmd *cli.Command) (*validateAgentConfig, error) {
 		timeout:            cmd.Duration("timeout"),
 		cleanup:            cmd.Bool("cleanup"),
 		debug:              cmd.Bool("debug"),
-		privileged:         cmd.Bool("privileged"),
 		requireGPU:         cmd.Bool("require-gpu"),
 		helmNamespaces:     cmd.StringSlice("helm-namespaces"),
 		helmAllNamespaces:  cmd.Bool("helm-all-namespaces"),
@@ -134,9 +132,9 @@ func deployAgentForValidation(ctx context.Context, cfg *validateAgentConfig) (*s
 		Tolerations:        cfg.tolerations,
 		Timeout:            cfg.timeout,
 		Cleanup:            cfg.cleanup,
-		Debug:              cfg.debug,
-		Privileged:         cfg.privileged,
-		RequireGPU:         cfg.requireGPU,
+		Debug:      cfg.debug,
+		Privileged: true,
+		RequireGPU: cfg.requireGPU,
 		HelmNamespaces:     cfg.helmNamespaces,
 		HelmAllNamespaces:  cfg.helmAllNamespaces,
 	}
@@ -423,12 +421,6 @@ func validateCmdFlags() []cli.Flag {
 			Name:     "cleanup",
 			Value:    true,
 			Usage:    "Remove Job and RBAC resources on completion",
-			Category: "Agent Deployment",
-		},
-		&cli.BoolFlag{
-			Name:     "privileged",
-			Value:    true,
-			Usage:    "Run agent in privileged mode (required for GPU/SystemD collectors)",
 			Category: "Agent Deployment",
 		},
 		&cli.BoolFlag{
