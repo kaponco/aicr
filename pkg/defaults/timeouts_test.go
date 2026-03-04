@@ -28,8 +28,8 @@ func TestTimeoutConstants(t *testing.T) {
 	}{
 		// Collector timeouts
 		{"CollectorTimeout", CollectorTimeout, 5 * time.Second, 30 * time.Second},
-		{"CollectorK8sTimeout", CollectorK8sTimeout, 10 * time.Second, 60 * time.Second},
-		{"CollectorTopologyTimeout", CollectorTopologyTimeout, 30 * time.Second, 120 * time.Second},
+		{"CollectorK8sTimeout", CollectorK8sTimeout, 30 * time.Second, 120 * time.Second},
+		{"CollectorTopologyTimeout", CollectorTopologyTimeout, 60 * time.Second, 180 * time.Second},
 
 		// Handler timeouts
 		{"RecipeHandlerTimeout", RecipeHandlerTimeout, 10 * time.Second, 60 * time.Second},
@@ -44,7 +44,7 @@ func TestTimeoutConstants(t *testing.T) {
 
 		// K8s timeouts
 		{"K8sJobCreationTimeout", K8sJobCreationTimeout, 10 * time.Second, 60 * time.Second},
-		{"K8sPodReadyTimeout", K8sPodReadyTimeout, 30 * time.Second, 120 * time.Second},
+		{"K8sPodReadyTimeout", K8sPodReadyTimeout, 1 * time.Minute, 3 * time.Minute},
 		{"K8sJobCompletionTimeout", K8sJobCompletionTimeout, 1 * time.Minute, 10 * time.Minute},
 		{"K8sCleanupTimeout", K8sCleanupTimeout, 10 * time.Second, 60 * time.Second},
 

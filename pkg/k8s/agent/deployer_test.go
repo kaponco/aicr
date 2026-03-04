@@ -124,9 +124,9 @@ func TestDeployer_EnsureRBAC(t *testing.T) {
 			t.Fatalf("ClusterRole not found: %v", err)
 		}
 
-		// Default: 4 rules (nodes, pods, clusterpolicies, services) - no secrets
-		if len(cr.Rules) != 4 {
-			t.Errorf("expected 4 rules (no secrets by default), got %d", len(cr.Rules))
+		// Default: 5 rules (nodes, pods, clusterpolicies, services, argocd) - no secrets
+		if len(cr.Rules) != 5 {
+			t.Errorf("expected 5 rules (no secrets by default), got %d", len(cr.Rules))
 		}
 	})
 
@@ -867,9 +867,9 @@ func TestDeployer_EnsureClusterRole_AllNamespaces(t *testing.T) {
 		t.Fatalf("ClusterRole not found: %v", err)
 	}
 
-	// HelmAllNamespaces: 5 rules (nodes, pods, clusterpolicies, services, secrets)
-	if len(cr.Rules) != 5 {
-		t.Errorf("expected 5 rules with HelmAllNamespaces, got %d", len(cr.Rules))
+	// HelmAllNamespaces: 6 rules (nodes, pods, clusterpolicies, services, argocd, secrets)
+	if len(cr.Rules) != 6 {
+		t.Errorf("expected 6 rules with HelmAllNamespaces, got %d", len(cr.Rules))
 	}
 
 	// Verify secrets rule is present

@@ -131,6 +131,11 @@ func (d *Deployer) ensureClusterRole(ctx context.Context) error {
 			Resources: []string{"services"},
 			Verbs:     []string{"get", "list"},
 		},
+		{
+			APIGroups: []string{"argoproj.io"},
+			Resources: []string{"applications"},
+			Verbs:     []string{"get", "list"},
+		},
 	}
 
 	if d.config.HelmAllNamespaces {

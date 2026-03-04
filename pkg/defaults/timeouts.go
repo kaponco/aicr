@@ -23,14 +23,15 @@ const (
 	CollectorTimeout = 10 * time.Second
 
 	// CollectorK8sTimeout is the timeout for Kubernetes API calls in collectors.
-	CollectorK8sTimeout = 30 * time.Second
+	// Covers 6 sequential sub-collectors (server, image, policy, node, helm, argocd).
+	CollectorK8sTimeout = 60 * time.Second
 )
 
 // Node topology collector constants.
 const (
 	// CollectorTopologyTimeout is the timeout for node topology collection.
 	// Longer than standard K8s collector because of paginated node listing.
-	CollectorTopologyTimeout = 60 * time.Second
+	CollectorTopologyTimeout = 90 * time.Second
 
 	// TopologyListPageSize is the number of nodes per List API page.
 	TopologyListPageSize = int64(500)
@@ -77,7 +78,8 @@ const (
 	K8sJobCreationTimeout = 30 * time.Second
 
 	// K8sPodReadyTimeout is the timeout for waiting for pods to be ready.
-	K8sPodReadyTimeout = 60 * time.Second
+	// Needs headroom for image pull + scheduling in large clusters.
+	K8sPodReadyTimeout = 2 * time.Minute
 
 	// K8sJobCompletionTimeout is the default timeout for job completion.
 	K8sJobCompletionTimeout = 5 * time.Minute
