@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.13] - 2026-03-05
+
+### Bug Fixes
+
+- *(ci)* Prevent gh-pages deployment deadlock during release by [@mchmarny](https://github.com/mchmarny)
+
+### New Features
+
+- Add local health check validation Make targets by [@mchmarny](https://github.com/mchmarny)
+
+### Other Tasks
+
+- Remove stale plan files by [@mchmarny](https://github.com/mchmarny)
+
 ## [0.8.12] - 2026-03-05
 
 ### Bug Fixes
