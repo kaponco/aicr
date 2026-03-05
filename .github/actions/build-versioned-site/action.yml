@@ -1,0 +1,148 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: 'Build Versioned Site'
+description: 'Builds Hugo site for the N most recent semver tags and generates a root redirect to the latest version'
+
+inputs:
+  retention_count:
+    description: 'Number of most recent semver tags to build'
+    required: false
+    default: '3'
+
+outputs:
+  output_dir:
+    description: 'Path to the combined output directory containing all versioned builds'
+    value: ${{ steps.build.outputs.output_dir }}
+  latest_version:
+    description: 'The latest semver tag that was built'
+    value: ${{ steps.build.outputs.latest_version }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Build versioned site
+      id: build
+      shell: bash
+      env:
+        RETENTION_COUNT: ${{ inputs.retention_count }}
+      run: |
+        set -euo pipefail
+
+        OUTPUT_DIR="${GITHUB_WORKSPACE}/versioned-site-output"
+        mkdir -p "${OUTPUT_DIR}"
+
+        # Discover the N most recent semver tags
+        TAGS=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' \
+          | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+          | sort -V -r \
+          | head -n "${RETENTION_COUNT}")
+
+        if [ -z "${TAGS}" ]; then
+          echo "::error::No semver tags found matching v*.*.*"
+          exit 1
+        fi
+
+        LATEST_VERSION=$(echo "${TAGS}" | head -n 1)
+        echo "Discovered tags (newest first):"
+        echo "${TAGS}"
+        echo "Latest version: ${LATEST_VERSION}"
+
+        # Build the version list for the Docsy version dropdown.
+        # Each entry has version (display name) and url (absolute link).
+        VERSIONS_FILE="${RUNNER_TEMP}/versions.yaml"
+        : > "${VERSIONS_FILE}"
+        while IFS= read -r tag; do
+          DISPLAY_NAME="${tag}"
+          if [ "${tag}" = "${LATEST_VERSION}" ]; then
+            DISPLAY_NAME="${tag} (latest)"
+          fi
+          echo "- version: \"${DISPLAY_NAME}\"" >> "${VERSIONS_FILE}"
+          echo "  url: \"https://aicr.dgxc.io/${tag}/\"" >> "${VERSIONS_FILE}"
+        done <<< "${TAGS}"
+
+        echo "Versions file:"
+        cat "${VERSIONS_FILE}"
+
+        # Build each tag
+        while IFS= read -r tag; do
+          echo ""
+          echo "========================================="
+          echo "Building site for ${tag}"
+          echo "========================================="
+
+          WORK_DIR="${RUNNER_TEMP}/site-build-${tag}"
+          mkdir -p "${WORK_DIR}"
+
+          # Extract the tag's site/ directory via git archive
+          git archive "${tag}" -- site/ | tar -x -C "${WORK_DIR}"
+
+          SITE_DIR="${WORK_DIR}/site"
+          if [ ! -d "${SITE_DIR}" ]; then
+            echo "::warning::Tag ${tag} has no site/ directory, skipping"
+            continue
+          fi
+
+          # Patch hugo.yaml: set baseURL for this version
+          yq eval -i ".baseURL = \"https://aicr.dgxc.io/${tag}/\"" "${SITE_DIR}/hugo.yaml"
+
+          # Patch hugo.yaml: set the version dropdown entries
+          yq eval -i ".params.versions = load(\"${VERSIONS_FILE}\")" "${SITE_DIR}/hugo.yaml"
+
+          echo "Patched hugo.yaml for ${tag}:"
+          yq eval '.baseURL, .params.versions' "${SITE_DIR}/hugo.yaml"
+
+          # Install Node.js dependencies
+          echo "Running npm ci for ${tag}..."
+          (cd "${SITE_DIR}" && npm ci --prefer-offline --no-audit 2>/dev/null)
+
+          # Build with Hugo
+          echo "Running hugo build for ${tag}..."
+          (cd "${SITE_DIR}" && hugo --minify --destination "${OUTPUT_DIR}/${tag}/")
+
+          echo "Build complete for ${tag}"
+
+          # Clean up working directory to save disk space
+          rm -rf "${WORK_DIR}"
+        done <<< "${TAGS}"
+
+        # Generate root index.html that redirects to the latest version
+        LATEST_URL="https://aicr.dgxc.io/${LATEST_VERSION}/"
+        printf '%s\n' \
+          '<!DOCTYPE html>' \
+          '<html lang="en">' \
+          '<head>' \
+          '  <meta charset="utf-8">' \
+          '  <title>Redirecting to latest version...</title>' \
+          "  <meta http-equiv=\"refresh\" content=\"0; url=${LATEST_URL}\">" \
+          "  <link rel=\"canonical\" href=\"${LATEST_URL}\">" \
+          '</head>' \
+          '<body>' \
+          "  <p>Redirecting to <a href=\"${LATEST_URL}\">latest version (${LATEST_VERSION})</a>...</p>" \
+          "  <script>window.location.replace(\"${LATEST_URL}\");</script>" \
+          '</body>' \
+          '</html>' > "${OUTPUT_DIR}/index.html"
+
+        echo ""
+        echo "========================================="
+        echo "Versioned site build complete"
+        echo "Output directory: ${OUTPUT_DIR}"
+        echo "Latest version: ${LATEST_VERSION}"
+        echo "Contents:"
+        ls -la "${OUTPUT_DIR}"
+        echo "========================================="
+
+        # Set outputs
+        echo "output_dir=${OUTPUT_DIR}" >> "${GITHUB_OUTPUT}"
+        echo "latest_version=${LATEST_VERSION}" >> "${GITHUB_OUTPUT}"
