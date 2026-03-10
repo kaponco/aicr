@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.4] - 2026-03-10
+
+### Bug Fixes
+
+- Avoid GitHub API rate limit in install script  by [@yuanchen8911](https://github.com/yuanchen8911)
+- *(recipes)* Add missing gpu-operator dependency refs  by [@yuanchen8911](https://github.com/yuanchen8911)
+
+### New Features
+
+- Add Homebrew formula publishing to goreleaser by [@mchmarny](https://github.com/mchmarny)
+
+### Other Tasks
+
+- Add meta prompt by [@mchmarny](https://github.com/mchmarny)
+- *(recipes)* Add DRA vs device-plugin GPU allocation guidance  by [@yuanchen8911](https://github.com/yuanchen8911)
+
 ## [0.10.3] - 2026-03-10
 
 ### Bug Fixes
