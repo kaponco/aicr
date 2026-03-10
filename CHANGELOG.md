@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.5] - 2026-03-10
+
+### Bug Fixes
+
+- *(tests)* Update cuj1-training deployment order for kubeflow-trainer deps by [@mchmarny](https://github.com/mchmarny)
+
 ## [0.10.4] - 2026-03-10
 
 ### Bug Fixes
