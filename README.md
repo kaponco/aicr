@@ -23,7 +23,11 @@ Every AICR recipe is:
 Install and generate your first recipe in under two minutes:
 
 ```bash
-# Install the CLI
+# Install the CLI (Homebrew)
+brew tap NVIDIA/aicr
+brew install aicr
+
+# Or use the install script
 curl -sfL https://raw.githubusercontent.com/NVIDIA/aicr/main/install | bash -s --
 
 # Capture your cluster's current state
