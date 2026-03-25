@@ -2,8 +2,6 @@
 
 Demonstration of supply chain security artifacts provided by AI Cluster Runtime (AICR).
 
-![software supply chain security](images/s3c.png)
-
 ## Overview
 
 AICR (AICR) provides supply chain security artifacts:
