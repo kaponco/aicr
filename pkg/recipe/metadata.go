@@ -42,6 +42,7 @@ type ComponentType string
 const (
 	ComponentTypeHelm      ComponentType = "Helm"
 	ComponentTypeKustomize ComponentType = "Kustomize"
+	ComponentTypeOLM       ComponentType = "OLM"
 )
 
 // Constraint represents a deployment constraint/assumption.
@@ -105,6 +106,13 @@ type ComponentRef struct {
 
 	// Path is the path within the repository to the kustomization (for Kustomize).
 	Path string `json:"path,omitempty" yaml:"path,omitempty"`
+
+	// Package is the OLM package name (for OLM components, e.g., "gpu-operator-certified").
+	Package string `json:"package,omitempty" yaml:"package,omitempty"`
+
+	// CustomResources lists custom resource files to include (for OLM components).
+	// Paths are relative to the data directory.
+	CustomResources []string `json:"customResources,omitempty" yaml:"customResources,omitempty"`
 
 	// Cleanup indicates whether to uninstall this component after validation.
 	// Used for validation infrastructure components (e.g., nccl-doctor).
@@ -237,6 +245,20 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		}
 		if ref.Path == "" && config.Kustomize.DefaultPath != "" {
 			ref.Path = config.Kustomize.DefaultPath
+		}
+	case ComponentTypeOLM:
+		// Apply OLM defaults
+		if ref.Package == "" && config.OLM.RequiredService.Package != "" {
+			ref.Package = config.OLM.RequiredService.Package
+		}
+		if ref.Version == "" && config.OLM.RequiredService.Version != "" {
+			ref.Version = config.OLM.RequiredService.Version
+		}
+		if ref.Namespace == "" && config.OLM.DefaultNamespace != "" {
+			ref.Namespace = config.OLM.DefaultNamespace
+		}
+		if len(ref.CustomResources) == 0 && len(config.OLM.CustomResources) > 0 {
+			ref.CustomResources = config.OLM.CustomResources
 		}
 	}
 

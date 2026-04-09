@@ -640,6 +640,36 @@ func TestComponentConfig_GetType(t *testing.T) {
 			},
 			expected: ComponentTypeKustomize,
 		},
+		{
+			name: "olm config returns OLM",
+			config: &ComponentConfig{
+				Name: "test",
+				OLM: OLMConfig{
+					RequiredService: OLMRequiredService{
+						Package: "test-operator-certified",
+						Version: ">1.0",
+					},
+					DefaultNamespace: "test-namespace",
+				},
+			},
+			expected: ComponentTypeOLM,
+		},
+		{
+			name: "olm takes precedence over helm",
+			config: &ComponentConfig{
+				Name: "test",
+				Helm: HelmConfig{
+					DefaultRepository: "https://charts.example.com",
+					DefaultChart:      "example/chart",
+				},
+				OLM: OLMConfig{
+					RequiredService: OLMRequiredService{
+						Package: "test-operator-certified",
+					},
+				},
+			},
+			expected: ComponentTypeOLM,
+		},
 	}
 
 	for _, tt := range tests {
@@ -668,7 +698,7 @@ func TestComponentRegistry_Validate_MutuallyExclusiveHelmKustomize(t *testing.T)
 		}
 		errs := registry.Validate()
 		for _, e := range errs {
-			if strings.Contains(e.Error(), "both helm and kustomize") {
+			if strings.Contains(e.Error(), "kustomize configuration cannot coexist") {
 				t.Errorf("unexpected error for helm-only component: %v", e)
 			}
 		}
@@ -688,7 +718,7 @@ func TestComponentRegistry_Validate_MutuallyExclusiveHelmKustomize(t *testing.T)
 		}
 		errs := registry.Validate()
 		for _, e := range errs {
-			if strings.Contains(e.Error(), "both helm and kustomize") {
+			if strings.Contains(e.Error(), "kustomize configuration cannot coexist") {
 				t.Errorf("unexpected error for kustomize-only component: %v", e)
 			}
 		}
@@ -713,13 +743,13 @@ func TestComponentRegistry_Validate_MutuallyExclusiveHelmKustomize(t *testing.T)
 		errs := registry.Validate()
 		found := false
 		for _, e := range errs {
-			if strings.Contains(e.Error(), "both helm and kustomize") {
+			if strings.Contains(e.Error(), "kustomize configuration cannot coexist") {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected error about both helm and kustomize configuration")
+			t.Error("expected error about kustomize configuration incompatibility")
 		}
 	})
 }

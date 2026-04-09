@@ -69,6 +69,35 @@ components:
         tolerationPaths:
           - worker.tolerations
 
+  - name: nfd-operator
+    displayName: nfd-operator
+    valueOverrideKeys:
+      - nfdoperator
+    healthCheck:
+      assertFile: checks/nfd-operator/health-check.yaml
+    olm:
+      requiredService:
+        package: nfd
+        version: ">4.0"
+      defaultNamespace: openshift-nfd
+      customResources:
+        - components/nfd-operator/cr-node-feature-discovery.yaml
+    nodeScheduling:
+      system:
+        nodeSelectorPaths:
+          - operator.nodeSelector
+          - gc.nodeSelector
+          - master.nodeSelector
+        tolerationPaths:
+          - operator.tolerations
+          - gc.tolerations
+          - master.tolerations
+      accelerated:
+        nodeSelectorPaths:
+          - daemonsets.nodeSelector
+        tolerationPaths:
+          - daemonsets.tolerations
+
   - name: gpu-operator
     displayName: gpu-operator
     valueOverrideKeys:
@@ -79,6 +108,13 @@ components:
       defaultRepository: https://helm.ngc.nvidia.com/nvidia
       defaultChart: nvidia/gpu-operator
       defaultNamespace: gpu-operator
+    olm:
+      requiredService:
+        package: gpu-operator-certified
+        version: ">25.0"
+      defaultNamespace: nvidia-gpu-operator
+      customResources:
+        - components/gpu-operator/cr-cluster-policy-ocp.yaml
     nodeScheduling:
       system:
         nodeSelectorPaths:

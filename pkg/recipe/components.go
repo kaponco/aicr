@@ -53,6 +53,9 @@ type ComponentConfig struct {
 	// Kustomize contains default Kustomize settings.
 	Kustomize KustomizeConfig `yaml:"kustomize,omitempty"`
 
+	// OLM contains default OLM (Operator Lifecycle Manager) settings.
+	OLM OLMConfig `yaml:"olm,omitempty"`
+
 	// NodeScheduling defines paths for injecting node selectors and tolerations.
 	NodeScheduling NodeSchedulingConfig `yaml:"nodeScheduling,omitempty"`
 
@@ -98,6 +101,28 @@ type KustomizeConfig struct {
 
 	// DefaultTag is the default Git tag, branch, or commit.
 	DefaultTag string `yaml:"defaultTag,omitempty"`
+}
+
+// OLMConfig contains default OLM (Operator Lifecycle Manager) settings for a component.
+type OLMConfig struct {
+	// RequiredService contains package and version information for OLM operators.
+	RequiredService OLMRequiredService `yaml:"requiredService,omitempty"`
+
+	// DefaultNamespace is the Kubernetes namespace for deploying this component via OLM.
+	DefaultNamespace string `yaml:"defaultNamespace,omitempty"`
+
+	// CustomResources lists custom resource files to include (relative to component directory).
+	CustomResources []string `yaml:"customResources,omitempty"`
+}
+
+// OLMRequiredService contains package and version requirements for OLM operators.
+type OLMRequiredService struct {
+	// Package is the OLM package name (e.g., "gpu-operator-certified").
+	Package string `yaml:"package,omitempty"`
+
+	// Version is the required version constraint (e.g., ">25.0").
+	// Note: Semantic version validation is not yet implemented.
+	Version string `yaml:"version,omitempty"`
 }
 
 // NodeSchedulingConfig defines paths for node scheduling injection.
@@ -298,13 +323,17 @@ func (r *ComponentRegistry) Validate() []error {
 		}
 	}
 
-	// Check for mutually exclusive helm/kustomize configuration
+	// Check for mutually exclusive deployment configurations
+	// Note: Helm and OLM can coexist (OLM for OCP, Helm for other services)
+	// but Kustomize is mutually exclusive with both Helm and OLM
 	for i, comp := range r.Components {
 		hasHelm := comp.Helm.DefaultRepository != "" || comp.Helm.DefaultChart != ""
 		hasKustomize := comp.Kustomize.DefaultSource != ""
+		hasOLM := comp.OLM.RequiredService.Package != ""
 
-		if hasHelm && hasKustomize {
-			errs = append(errs, errors.New(errors.ErrCodeInvalidRequest, fmt.Sprintf("component[%d] (%s): cannot have both helm and kustomize configuration", i, comp.Name)))
+		// Kustomize cannot coexist with Helm or OLM
+		if hasKustomize && (hasHelm || hasOLM) {
+			errs = append(errs, errors.New(errors.ErrCodeInvalidRequest, fmt.Sprintf("component[%d] (%s): kustomize configuration cannot coexist with helm or olm", i, comp.Name)))
 		}
 	}
 
@@ -376,11 +405,15 @@ func (c *ComponentConfig) GetValidations() []ComponentValidationConfig {
 }
 
 // GetType returns the component deployment type based on which config is present.
-// Returns ComponentTypeKustomize if Kustomize.DefaultSource is set,
+// Returns ComponentTypeOLM if OLM.RequiredService.Package is set,
+// ComponentTypeKustomize if Kustomize.DefaultSource is set,
 // otherwise returns ComponentTypeHelm (the default).
 func (c *ComponentConfig) GetType() ComponentType {
 	if c == nil {
 		return ComponentTypeHelm
+	}
+	if c.OLM.RequiredService.Package != "" {
+		return ComponentTypeOLM
 	}
 	if c.Kustomize.DefaultSource != "" {
 		return ComponentTypeKustomize
