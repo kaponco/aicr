@@ -356,7 +356,18 @@ echo "Deploying Cloud Native Stack components..."
 
 # Install components in order
 {{ range .Components -}}
-{{ if .IsKustomize -}}
+{{ if .IsOLM -}}
+{{- $compName := .Name }}
+{{- $compNS := .Namespace }}
+echo "Installing {{ .Name }} ({{ .Namespace }}) via OLM custom resources..."
+kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl apply -f - || helm_failed "{{ .Name }}"
+cd "${SCRIPT_DIR}/{{ .Name }}"
+{{- range .CustomResources }}
+retry "{{ $compName }} apply {{ .Filename }}" kubectl apply -f {{ .Filename }} -n {{ $compNS }} \
+  || helm_failed "{{ $compName }}"
+{{- end }}
+cd "${HELM_WORKDIR}"
+{{ else if .IsKustomize -}}
 echo "Installing {{ .Name }} ({{ .Namespace }}) via kustomize..."
 kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl apply -f - || helm_failed "{{ .Name }}"
 retry "{{ .Name }} kustomize apply" bash -c \

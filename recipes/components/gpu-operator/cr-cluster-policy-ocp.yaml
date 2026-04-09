@@ -31,6 +31,10 @@ spec:
   cdi:
     enabled: true
     default: true
+  dcgm:
+    enabled: true
+  gfd:
+    enabled: true
   dcgmExporter:
     enabled: true
     serviceMonitor:
@@ -42,9 +46,13 @@ spec:
     installDir: /usr/local/nvidia
   gdrcopy:
     enabled: true
-  # NFD is installed as a standalone OLM operator on OCP (Red Hat's nfd operator).
-  # Disable the GPU Operator's built-in NFD sub-chart to avoid conflicts.
-  nfd:
-    enabled: false
   sandboxWorkloads:
     enabled: false
+  nodeStatusExporter:
+    enabled: true
+  daemonsets:
+    tolerations:
+      - operator: Exists
+    rollingUpdate:
+      maxUnavailable: '1'
+    updateStrategy: RollingUpdate

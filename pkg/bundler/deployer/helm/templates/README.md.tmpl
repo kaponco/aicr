@@ -22,7 +22,9 @@ The following components are included (deployed in order):
 | Component | Type | Version | Namespace | Source |
 |-----------|------|---------|-----------|--------|
 {{ range .Components -}}
-{{ if .IsKustomize -}}
+{{ if .IsOLM -}}
+| {{ .Name }} | OLM | {{ .OLMVersion }} | {{ .Namespace }} | {{ .OLMPackage }} |
+{{ else if .IsKustomize -}}
 | {{ .Name }} | Kustomize | {{ .Tag }} | {{ .Namespace }} | {{ .Repository }} ({{ .Path }}) |
 {{ else if .HasChart -}}
 | {{ .Name }} | Helm | {{ .Version }} | {{ .Namespace }} | {{ .ChartName }} ({{ .Repository }}) |
@@ -67,7 +69,16 @@ Install components individually in order:
 {{ range .Components }}
 ### {{ .Name }}
 
-{{ if .IsKustomize -}}
+{{ if .IsOLM -}}
+{{- $compName := .Name }}
+{{- $compNS := .Namespace }}
+```bash
+kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl apply -f -
+{{- range .CustomResources }}
+kubectl apply -f {{ $compName }}/{{ .Filename }} -n {{ $compNS }}
+{{- end }}
+```
+{{ else if .IsKustomize -}}
 ```bash
 kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl apply -f -
 kustomize build '{{ .Repository }}//{{ .Path }}{{ if .Tag }}?ref={{ .Tag }}{{ end }}' \
@@ -130,7 +141,15 @@ helm upgrade <component> <chart> --version <version> -n <namespace> -f <componen
 To remove components (reverse order):
 
 {{ range .ComponentsReversed -}}
-{{ if .IsKustomize -}}
+{{ if .IsOLM -}}
+{{- $compName := .Name }}
+{{- $compNS := .Namespace }}
+```bash
+{{- range .CustomResources }}
+kubectl delete -f {{ $compName }}/{{ .Filename }} -n {{ $compNS }} --ignore-not-found
+{{- end }}
+```
+{{ else if .IsKustomize -}}
 ```bash
 kustomize build '{{ .Repository }}//{{ .Path }}{{ if .Tag }}?ref={{ .Tag }}{{ end }}' \
   | kubectl delete -n {{ .Namespace }} --ignore-not-found -f -

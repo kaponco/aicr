@@ -50,18 +50,27 @@ const criteriaAny = "any"
 
 // ComponentData contains data for rendering per-component templates.
 type ComponentData struct {
-	Name         string
-	Namespace    string
-	Repository   string
-	ChartName    string
-	Version      string // Original version string (preserves 'v' prefix) for helm install --version
-	ChartVersion string // Normalized version (no 'v' prefix) for chart metadata labels
-	HasManifests bool
-	HasChart     bool
-	IsOCI        bool
-	IsKustomize  bool   // True when the component uses Kustomize instead of Helm
-	Tag          string // Git ref for Kustomize components (tag, branch, or commit)
-	Path         string // Path within the repository to the kustomization
+	Name            string
+	Namespace       string
+	Repository      string
+	ChartName       string
+	Version         string // Original version string (preserves 'v' prefix) for helm install --version
+	ChartVersion    string // Normalized version (no 'v' prefix) for chart metadata labels
+	HasManifests    bool
+	HasChart        bool
+	IsOCI           bool
+	IsKustomize     bool                 // True when the component uses Kustomize instead of Helm
+	Tag             string               // Git ref for Kustomize components (tag, branch, or commit)
+	Path            string               // Path within the repository to the kustomization
+	IsOLM           bool                 // True when the component uses OLM (Operator Lifecycle Manager)
+	OLMPackage      string               // OLM package name
+	OLMVersion      string               // OLM version requirement
+	CustomResources []CustomResourceData // Custom resources for OLM components
+}
+
+// CustomResourceData contains data for a custom resource file.
+type CustomResourceData struct {
+	Filename string // Base filename (e.g., "cr-node-feature-discovery.yaml")
 }
 
 // compile-time interface check
@@ -86,6 +95,10 @@ type Generator struct {
 	// ComponentManifests maps component name → manifest path → content.
 	// Each component's manifests are placed in its own manifests/ subdirectory.
 	ComponentManifests map[string]map[string][]byte
+
+	// ComponentCustomResources maps component name → custom resource path → content.
+	// Each component's custom resources are placed directly in its subdirectory.
+	ComponentCustomResources map[string]map[string][]byte
 
 	// DataFiles lists additional file paths (relative to output dir) to include
 	// in checksum generation. Used for external data files copied into the bundle.
@@ -215,6 +228,7 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 		}
 
 		isKustomize := ref.Type == recipe.ComponentTypeKustomize
+		isOLM := ref.Type == recipe.ComponentTypeOLM
 
 		chartName := ref.Chart
 		if chartName == "" {
@@ -226,19 +240,33 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 		// Helm handles 'v' prefixes correctly via fuzzy matching.
 		version := ref.Version
 
+		// Collect custom resources for OLM components
+		var customResources []CustomResourceData
+		if isOLM {
+			for _, crPath := range ref.CustomResources {
+				customResources = append(customResources, CustomResourceData{
+					Filename: filepath.Base(crPath),
+				})
+			}
+		}
+
 		components = append(components, ComponentData{
-			Name:         ref.Name,
-			Namespace:    ref.Namespace,
-			Repository:   ref.Source,
-			ChartName:    chartName,
-			Version:      version,
-			ChartVersion: deployer.NormalizeVersionWithDefault(ref.Version),
-			HasManifests: hasManifests,
-			HasChart:     !isKustomize && ref.Source != "",
-			IsOCI:        isOCI,
-			IsKustomize:  isKustomize,
-			Tag:          ref.Tag,
-			Path:         ref.Path,
+			Name:            ref.Name,
+			Namespace:       ref.Namespace,
+			Repository:      ref.Source,
+			ChartName:       chartName,
+			Version:         version,
+			ChartVersion:    deployer.NormalizeVersionWithDefault(ref.Version),
+			HasManifests:    hasManifests,
+			HasChart:        !isKustomize && !isOLM && ref.Source != "",
+			IsOCI:           isOCI,
+			IsKustomize:     isKustomize,
+			Tag:             ref.Tag,
+			Path:            ref.Path,
+			IsOLM:           isOLM,
+			OLMPackage:      ref.Package,
+			OLMVersion:      ref.Version,
+			CustomResources: customResources,
 		})
 	}
 
@@ -364,6 +392,56 @@ func (g *Generator) generateComponentDirectories(ctx context.Context, components
 				}
 			}
 		}
+
+		// Write custom resources for OLM components
+		if comp.IsOLM && input.ComponentCustomResources != nil {
+			crFiles, crSize, err := g.writeCustomResources(comp.Name, componentDir, input.ComponentCustomResources)
+			if err != nil {
+				return nil, 0, err
+			}
+			files = append(files, crFiles...)
+			totalSize += crSize
+		}
+	}
+
+	return files, totalSize, nil
+}
+
+// writeCustomResources writes custom resource files for an OLM component.
+func (g *Generator) writeCustomResources(componentName, componentDir string, componentCustomResources map[string]map[string][]byte) ([]string, int64, error) {
+	customResources, ok := componentCustomResources[componentName]
+	if !ok || len(customResources) == 0 {
+		return nil, 0, nil
+	}
+
+	// Sort CR paths for deterministic output
+	crPaths := make([]string, 0, len(customResources))
+	for p := range customResources {
+		crPaths = append(crPaths, p)
+	}
+	sort.Strings(crPaths)
+
+	var files []string
+	var totalSize int64
+
+	for _, crPath := range crPaths {
+		content := customResources[crPath]
+		filename := filepath.Base(crPath)
+		outputPath, pathErr := shared.SafeJoin(componentDir, filename)
+		if pathErr != nil {
+			return nil, 0, errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("invalid custom resource filename %q in component %s", filename, componentName))
+		}
+
+		if err := os.WriteFile(outputPath, content, 0600); err != nil {
+			return nil, 0, errors.WrapWithContext(errors.ErrCodeInternal, "failed to write custom resource", err,
+				map[string]any{"component": componentName, "filename": filename})
+		}
+
+		files = append(files, outputPath)
+		totalSize += int64(len(content))
+
+		slog.Debug("wrote custom resource", "component", componentName, "filename", filename)
 	}
 
 	return files, totalSize, nil
@@ -492,14 +570,14 @@ func reverseComponents(components []ComponentData) []ComponentData {
 	return reversed
 }
 
-// uniqueNamespaces returns deduplicated namespaces from Helm/Kustomize components,
+// uniqueNamespaces returns deduplicated namespaces from Helm/Kustomize/OLM components,
 // preserving order. Manifest-only components are excluded to match the previous
 // behavior where namespace cleanup only occurred inside HasChart/IsKustomize branches.
 func uniqueNamespaces(components []ComponentData) []string {
 	seen := make(map[string]bool)
 	var namespaces []string
 	for _, c := range components {
-		if c.Namespace != "" && !seen[c.Namespace] && (c.HasChart || c.IsKustomize) {
+		if c.Namespace != "" && !seen[c.Namespace] && (c.HasChart || c.IsKustomize || c.IsOLM) {
 			seen[c.Namespace] = true
 			namespaces = append(namespaces, c.Namespace)
 		}

@@ -1008,3 +1008,32 @@ func (b *DefaultBundler) collectComponentManifests(ctx context.Context, recipeRe
 
 	return result, nil
 }
+
+// collectComponentCustomResources gathers custom resource file contents from OLM components,
+// keyed by component name then custom resource path.
+func (b *DefaultBundler) collectComponentCustomResources(ctx context.Context, recipeResult *recipe.RecipeResult) (map[string]map[string][]byte, error) {
+	result := make(map[string]map[string][]byte)
+
+	for _, ref := range recipeResult.ComponentRefs {
+		if err := ctx.Err(); err != nil {
+			return nil, errors.Wrap(errors.ErrCodeTimeout, "context cancelled while collecting custom resources", err)
+		}
+
+		// Only collect custom resources for OLM components
+		if ref.Type != recipe.ComponentTypeOLM || len(ref.CustomResources) == 0 {
+			continue
+		}
+
+		componentCRs := make(map[string][]byte, len(ref.CustomResources))
+		for _, crPath := range ref.CustomResources {
+			content, err := recipe.GetManifestContent(crPath)
+			if err != nil {
+				return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to load custom resource %s for component %s", crPath, ref.Name), err)
+			}
+			componentCRs[crPath] = content
+		}
+		result[ref.Name] = componentCRs
+	}
+
+	return result, nil
+}

@@ -1324,3 +1324,171 @@ func TestMake_PreservesTimeoutFromExtractValues(t *testing.T) {
 			errors.ErrCodeTimeout, se.Code, err)
 	}
 }
+
+func TestCollectComponentCustomResources(t *testing.T) {
+	bundler, err := New()
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	t.Run("no custom resources", func(t *testing.T) {
+		recipeResult := &recipe.RecipeResult{
+			ComponentRefs: []recipe.ComponentRef{
+				{
+					Name:            "gpu-operator",
+					Type:            recipe.ComponentTypeHelm,
+					CustomResources: []string{},
+				},
+			},
+		}
+
+		contents, err := bundler.collectComponentCustomResources(context.Background(), recipeResult)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(contents) != 0 {
+			t.Errorf("expected 0 contents, got %d", len(contents))
+		}
+	})
+
+	t.Run("empty custom resources for OLM component", func(t *testing.T) {
+		recipeResult := &recipe.RecipeResult{
+			ComponentRefs: []recipe.ComponentRef{
+				{
+					Name:            "nfd-operator",
+					Type:            recipe.ComponentTypeOLM,
+					CustomResources: []string{},
+				},
+			},
+		}
+
+		contents, err := bundler.collectComponentCustomResources(context.Background(), recipeResult)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(contents) != 0 {
+			t.Errorf("expected 0 contents, got %d", len(contents))
+		}
+	})
+
+	t.Run("non-OLM component with custom resources", func(t *testing.T) {
+		recipeResult := &recipe.RecipeResult{
+			ComponentRefs: []recipe.ComponentRef{
+				{
+					Name:            "gpu-operator",
+					Type:            recipe.ComponentTypeHelm,
+					CustomResources: []string{"components/gpu-operator/some-file.yaml"},
+				},
+			},
+		}
+
+		contents, err := bundler.collectComponentCustomResources(context.Background(), recipeResult)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		// Non-OLM components should be skipped
+		if len(contents) != 0 {
+			t.Errorf("expected 0 contents for non-OLM component, got %d", len(contents))
+		}
+	})
+
+	t.Run("invalid custom resource path", func(t *testing.T) {
+		recipeResult := &recipe.RecipeResult{
+			ComponentRefs: []recipe.ComponentRef{
+				{
+					Name:            "nfd-operator",
+					Type:            recipe.ComponentTypeOLM,
+					CustomResources: []string{"nonexistent/cr.yaml"},
+				},
+			},
+		}
+
+		_, err := bundler.collectComponentCustomResources(context.Background(), recipeResult)
+		if err == nil {
+			t.Fatal("expected error for invalid custom resource path")
+		}
+		if !strings.Contains(err.Error(), "nonexistent/cr.yaml") {
+			t.Errorf("error should mention the invalid file: %v", err)
+		}
+	})
+
+	t.Run("OLM component with valid custom resource", func(t *testing.T) {
+		recipeResult := &recipe.RecipeResult{
+			ComponentRefs: []recipe.ComponentRef{
+				{
+					Name:            "nfd-operator",
+					Type:            recipe.ComponentTypeOLM,
+					CustomResources: []string{"components/nfd-operator/cr-node-feature-discovery.yaml"},
+				},
+			},
+		}
+
+		contents, err := bundler.collectComponentCustomResources(context.Background(), recipeResult)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(contents) != 1 {
+			t.Errorf("expected 1 component with custom resources, got %d", len(contents))
+		}
+		if _, ok := contents["nfd-operator"]; !ok {
+			t.Error("expected nfd-operator in results")
+		}
+		if len(contents["nfd-operator"]) != 1 {
+			t.Errorf("expected 1 custom resource for nfd-operator, got %d", len(contents["nfd-operator"]))
+		}
+	})
+
+	t.Run("multiple OLM components with custom resources", func(t *testing.T) {
+		recipeResult := &recipe.RecipeResult{
+			ComponentRefs: []recipe.ComponentRef{
+				{
+					Name:            "nfd-operator",
+					Type:            recipe.ComponentTypeOLM,
+					CustomResources: []string{"components/nfd-operator/cr-node-feature-discovery.yaml"},
+				},
+				{
+					Name:            "gpu-operator",
+					Type:            recipe.ComponentTypeOLM,
+					CustomResources: []string{"components/gpu-operator/cr-cluster-policy-ocp.yaml"},
+				},
+			},
+		}
+
+		contents, err := bundler.collectComponentCustomResources(context.Background(), recipeResult)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(contents) != 2 {
+			t.Errorf("expected 2 components with custom resources, got %d", len(contents))
+		}
+		if _, ok := contents["nfd-operator"]; !ok {
+			t.Error("expected nfd-operator in results")
+		}
+		if _, ok := contents["gpu-operator"]; !ok {
+			t.Error("expected gpu-operator in results")
+		}
+	})
+
+	t.Run("cancelled context", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		recipeResult := &recipe.RecipeResult{
+			ComponentRefs: []recipe.ComponentRef{
+				{
+					Name:            "nfd-operator",
+					Type:            recipe.ComponentTypeOLM,
+					CustomResources: []string{"components/nfd-operator/cr-node-feature-discovery.yaml"},
+				},
+			},
+		}
+
+		_, err := bundler.collectComponentCustomResources(ctx, recipeResult)
+		if err == nil {
+			t.Fatal("expected error for cancelled context")
+		}
+		if !strings.Contains(err.Error(), "cancelled") && !strings.Contains(err.Error(), "context") {
+			t.Errorf("error should mention context cancellation: %v", err)
+		}
+	})
+}

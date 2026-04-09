@@ -2349,6 +2349,215 @@ func TestGenerate_DoesNotMutateComponentValues(t *testing.T) {
 	}
 }
 
+func TestWriteCustomResources(t *testing.T) {
+	g := NewGenerator()
+
+	tests := []struct {
+		name                     string
+		componentName            string
+		componentCustomResources map[string]map[string][]byte
+		wantFiles                int
+		wantErr                  bool
+	}{
+		{
+			name:          "no custom resources",
+			componentName: "test-component",
+			componentCustomResources: map[string]map[string][]byte{
+				"other-component": {
+					"components/other/cr.yaml": []byte("test"),
+				},
+			},
+			wantFiles: 0,
+			wantErr:   false,
+		},
+		{
+			name:          "empty custom resources map",
+			componentName: "test-component",
+			componentCustomResources: map[string]map[string][]byte{
+				"test-component": {},
+			},
+			wantFiles: 0,
+			wantErr:   false,
+		},
+		{
+			name:          "single custom resource",
+			componentName: "nfd-operator",
+			componentCustomResources: map[string]map[string][]byte{
+				"nfd-operator": {
+					"components/nfd-operator/cr-node-feature-discovery.yaml": []byte("apiVersion: nfd.openshift.io/v1\nkind: NodeFeatureDiscovery\n"),
+				},
+			},
+			wantFiles: 1,
+			wantErr:   false,
+		},
+		{
+			name:          "multiple custom resources",
+			componentName: "gpu-operator",
+			componentCustomResources: map[string]map[string][]byte{
+				"gpu-operator": {
+					"components/gpu-operator/cr-cluster-policy.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\n"),
+					"components/gpu-operator/cr-dcgm-config.yaml":    []byte("apiVersion: nvidia.com/v1\nkind: DCGMConfig\n"),
+				},
+			},
+			wantFiles: 2,
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outputDir := t.TempDir()
+
+			files, totalSize, err := g.writeCustomResources(tt.componentName, outputDir, tt.componentCustomResources)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeCustomResources() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if len(files) != tt.wantFiles {
+				t.Errorf("writeCustomResources() got %d files, want %d", len(files), tt.wantFiles)
+			}
+
+			// Verify files were actually written
+			for _, file := range files {
+				if _, statErr := os.Stat(file); statErr != nil {
+					t.Errorf("writeCustomResources() file not found: %s", file)
+				}
+			}
+
+			// Verify totalSize matches actual content
+			var expectedSize int64
+			if crs, ok := tt.componentCustomResources[tt.componentName]; ok {
+				for _, content := range crs {
+					expectedSize += int64(len(content))
+				}
+			}
+			if totalSize != expectedSize {
+				t.Errorf("writeCustomResources() totalSize = %d, want %d", totalSize, expectedSize)
+			}
+		})
+	}
+}
+
+func TestGenerate_OLMComponents(t *testing.T) {
+	g := NewGenerator()
+	ctx := context.Background()
+	outputDir := t.TempDir()
+
+	input := &GeneratorInput{
+		RecipeResult: &recipe.RecipeResult{
+			Kind:       "RecipeResult",
+			APIVersion: "aicr.nvidia.com/v1alpha1",
+			Metadata: struct {
+				Version            string                     `json:"version,omitempty" yaml:"version,omitempty"`
+				AppliedOverlays    []string                   `json:"appliedOverlays,omitempty" yaml:"appliedOverlays,omitempty"`
+				ExcludedOverlays   []string                   `json:"excludedOverlays,omitempty" yaml:"excludedOverlays,omitempty"`
+				ConstraintWarnings []recipe.ConstraintWarning `json:"constraintWarnings,omitempty" yaml:"constraintWarnings,omitempty"`
+			}{
+				Version: "v0.11.1",
+			},
+			Criteria: &recipe.Criteria{
+				Service:     "ocp",
+				Accelerator: "h100",
+				Intent:      "training",
+			},
+			ComponentRefs: []recipe.ComponentRef{
+				{
+					Name:            "nfd-operator",
+					Namespace:       "openshift-nfd",
+					Type:            recipe.ComponentTypeOLM,
+					Package:         "nfd",
+					Version:         ">4.0",
+					CustomResources: []string{"components/nfd-operator/cr-node-feature-discovery.yaml"},
+				},
+				{
+					Name:            "gpu-operator",
+					Namespace:       "nvidia-gpu-operator",
+					Type:            recipe.ComponentTypeOLM,
+					Package:         "gpu-operator-certified",
+					Version:         "v25.10.1",
+					CustomResources: []string{"components/gpu-operator/cr-cluster-policy-ocp.yaml"},
+				},
+			},
+			DeploymentOrder: []string{"nfd-operator", "gpu-operator"},
+		},
+		ComponentValues: map[string]map[string]any{
+			"nfd-operator":  {},
+			"gpu-operator": {},
+		},
+		ComponentCustomResources: map[string]map[string][]byte{
+			"nfd-operator": {
+				"components/nfd-operator/cr-node-feature-discovery.yaml": []byte("apiVersion: nfd.openshift.io/v1\nkind: NodeFeatureDiscovery\nmetadata:\n  name: nfd-instance\n"),
+			},
+			"gpu-operator": {
+				"components/gpu-operator/cr-cluster-policy-ocp.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\nmetadata:\n  name: gpu-cluster-policy\n"),
+			},
+		},
+		Version:          "v0.11.1",
+		IncludeChecksums: true,
+	}
+
+	output, err := g.Generate(ctx, input, outputDir)
+	if err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	if output == nil {
+		t.Fatal("Generate() returned nil output")
+	}
+
+	// Verify OLM custom resources were written
+	nfdCR := filepath.Join(outputDir, "nfd-operator", "cr-node-feature-discovery.yaml")
+	if _, err := os.Stat(nfdCR); err != nil {
+		t.Errorf("NFD custom resource not found: %v", err)
+	}
+
+	gpuCR := filepath.Join(outputDir, "gpu-operator", "cr-cluster-policy-ocp.yaml")
+	if _, err := os.Stat(gpuCR); err != nil {
+		t.Errorf("GPU Operator custom resource not found: %v", err)
+	}
+
+	// Verify READMEs contain OLM deployment instructions
+	nfdReadme := filepath.Join(outputDir, "nfd-operator", "README.md")
+	readmeContent, err := os.ReadFile(nfdReadme)
+	if err != nil {
+		t.Fatalf("Failed to read NFD README: %v", err)
+	}
+	if !strings.Contains(string(readmeContent), "OLM (Operator Lifecycle Manager)") {
+		t.Error("NFD README does not mention OLM")
+	}
+	if !strings.Contains(string(readmeContent), "kubectl apply -f cr-node-feature-discovery.yaml") {
+		t.Error("NFD README does not contain kubectl apply command")
+	}
+
+	// Verify deploy.sh contains OLM deployment commands
+	deployScript := filepath.Join(outputDir, "deploy.sh")
+	deployContent, err := os.ReadFile(deployScript)
+	if err != nil {
+		t.Fatalf("Failed to read deploy.sh: %v", err)
+	}
+	if !strings.Contains(string(deployContent), "Installing nfd-operator") {
+		t.Error("deploy.sh does not mention nfd-operator installation")
+	}
+	if !strings.Contains(string(deployContent), "kubectl apply -f cr-node-feature-discovery.yaml -n openshift-nfd") {
+		t.Error("deploy.sh does not contain NFD custom resource application with namespace")
+	}
+
+	// Verify undeploy.sh contains OLM cleanup commands
+	undeployScript := filepath.Join(outputDir, "undeploy.sh")
+	undeployContent, err := os.ReadFile(undeployScript)
+	if err != nil {
+		t.Fatalf("Failed to read undeploy.sh: %v", err)
+	}
+	if !strings.Contains(string(undeployContent), "Uninstalling gpu-operator") {
+		t.Error("undeploy.sh does not mention gpu-operator uninstallation")
+	}
+	if !strings.Contains(string(undeployContent), "kubectl delete -f cr-cluster-policy-ocp.yaml -n nvidia-gpu-operator") {
+		t.Error("undeploy.sh does not contain GPU Operator custom resource deletion with namespace")
+	}
+}
+
 func TestGenerate_DataFiles(t *testing.T) {
 	t.Run("valid data file included in output", func(t *testing.T) {
 		ctx := context.Background()

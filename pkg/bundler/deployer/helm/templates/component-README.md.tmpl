@@ -1,6 +1,45 @@
 # {{ .Name }}
 
-{{ if .IsKustomize -}}
+{{ if .IsOLM -}}
+## Deployment Type
+OLM (Operator Lifecycle Manager)
+
+Package: {{ .OLMPackage }}
+{{ if .OLMVersion -}}Version: {{ .OLMVersion }}{{ end }}
+Namespace: {{ .Namespace }}
+
+**Prerequisites:** The {{ .OLMPackage }} operator must be pre-installed in the cluster via OLM.
+
+## Deploy
+
+```bash
+# Create namespace
+kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl apply -f -
+
+# Apply custom resources
+{{- range .CustomResources }}
+kubectl apply -f {{ .Filename }} -n {{ $.Namespace }}
+{{- end }}
+```
+
+## Verify
+
+```bash
+# Check custom resources
+{{- range .CustomResources }}
+kubectl get -f {{ .Filename }} -n {{ $.Namespace }}
+{{- end }}
+```
+
+## Undeploy
+
+```bash
+# Delete custom resources
+{{- range .CustomResources }}
+kubectl delete -f {{ .Filename }} -n {{ $.Namespace }} --ignore-not-found
+{{- end }}
+```
+{{ else if .IsKustomize -}}
 Source: {{ .Repository }}
 Path: {{ .Path }}
 {{ if .Tag -}}Tag: {{ .Tag }}{{ end }}
