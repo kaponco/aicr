@@ -80,8 +80,9 @@ components:
         package: nfd
         version: ">4.0"
       defaultNamespace: openshift-nfd
-      customResources:
-        - components/nfd-operator/cr-node-feature-discovery.yaml
+      kinds:
+        - NodeFeatureDiscovery
+      resourcesDir: resources
     nodeScheduling:
       system:
         nodeSelectorPaths:
@@ -113,8 +114,9 @@ components:
         package: gpu-operator-certified
         version: ">25.0"
       defaultNamespace: nvidia-gpu-operator
-      customResources:
-        - components/gpu-operator/cr-cluster-policy-ocp.yaml
+      kinds:
+        - ClusterPolicy
+      resourcesDir: resources
     nodeScheduling:
       system:
         nodeSelectorPaths:

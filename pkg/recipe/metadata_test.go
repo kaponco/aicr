@@ -1282,6 +1282,297 @@ func TestComponentRefApplyRegistryDefaults_HealthCheckAsserts(t *testing.T) {
 	})
 }
 
+func TestDiscoverCustomResources(t *testing.T) {
+	tests := []struct {
+		name     string
+		dirPath  string
+		files    map[string]string
+		expected []string
+	}{
+		{
+			name:    "directory with multiple yaml files - sorted",
+			dirPath: "components/gpu-operator/resources",
+			files: map[string]string{
+				"components/gpu-operator/resources/resources-ocp.yaml":          "kind: ClusterPolicy",
+				"components/gpu-operator/resources/resources-ocp-training.yaml": "kind: ClusterPolicy",
+				"components/gpu-operator/resources/config.yaml":                 "kind: Config",
+			},
+			expected: []string{
+				"components/gpu-operator/resources/config.yaml",
+				"components/gpu-operator/resources/resources-ocp-training.yaml",
+				"components/gpu-operator/resources/resources-ocp.yaml",
+			},
+		},
+		{
+			name:    "directory with yml extension",
+			dirPath: "components/nfd-operator/resources",
+			files: map[string]string{
+				"components/nfd-operator/resources/config.yml":    "kind: NodeFeatureDiscovery",
+				"components/nfd-operator/resources/resources.yml": "kind: NodeFeatureDiscovery",
+			},
+			expected: []string{
+				"components/nfd-operator/resources/config.yml",
+				"components/nfd-operator/resources/resources.yml",
+			},
+		},
+		{
+			name:    "directory with mixed files - only yaml/yml included",
+			dirPath: "components/test/resources",
+			files: map[string]string{
+				"components/test/resources/resource.yaml": "kind: Test",
+				"components/test/resources/readme.md":     "# README",
+				"components/test/resources/script.sh":     "#!/bin/bash",
+				"components/test/resources/config.json":   "{}",
+				"components/test/resources/data.txt":      "data",
+			},
+			expected: []string{
+				"components/test/resources/resource.yaml",
+			},
+		},
+		{
+			name:    "directory with both yaml and yml extensions",
+			dirPath: "components/mixed/resources",
+			files: map[string]string{
+				"components/mixed/resources/a.yaml": "kind: A",
+				"components/mixed/resources/b.yml":  "kind: B",
+				"components/mixed/resources/c.yaml": "kind: C",
+			},
+			expected: []string{
+				"components/mixed/resources/a.yaml",
+				"components/mixed/resources/b.yml",
+				"components/mixed/resources/c.yaml",
+			},
+		},
+		{
+			name:     "empty directory",
+			dirPath:  "components/empty/resources",
+			files:    map[string]string{},
+			expected: nil,
+		},
+		{
+			name:     "nonexistent directory",
+			dirPath:  "components/nonexistent/resources",
+			files:    map[string]string{},
+			expected: nil,
+		},
+		{
+			name:    "directory with subdirectories - only files at root level",
+			dirPath: "components/nested/resources",
+			files: map[string]string{
+				"components/nested/resources/root.yaml":         "kind: Root",
+				"components/nested/resources/subdir/nested.yaml": "kind: Nested",
+			},
+			expected: []string{
+				"components/nested/resources/root.yaml",
+				"components/nested/resources/subdir/nested.yaml",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test filesystem
+			fs := make(fstest.MapFS)
+			for path, content := range tt.files {
+				fs[path] = &fstest.MapFile{
+					Data: []byte(content),
+				}
+			}
+
+			// Set up test data provider
+			old := GetDataProvider()
+			SetDataProvider(&testFSProvider{fs: fs})
+			defer SetDataProvider(old)
+
+			// Test discoverCustomResources
+			result := discoverCustomResources(tt.dirPath)
+
+			// Check result length
+			if len(result) != len(tt.expected) {
+				t.Errorf("discoverCustomResources() returned %d files, want %d", len(result), len(tt.expected))
+				t.Logf("Got:  %v", result)
+				t.Logf("Want: %v", tt.expected)
+				return
+			}
+
+			// Results should be sorted and match expected
+			for i, path := range result {
+				if path != tt.expected[i] {
+					t.Errorf("discoverCustomResources()[%d] = %q, want %q", i, path, tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestApplyComponentDefaults_OLM(t *testing.T) {
+	tests := []struct {
+		name     string
+		ref      *ComponentRef
+		config   *ComponentConfig
+		expected ComponentRef
+	}{
+		{
+			name: "OLM component - apply defaults and clear Helm fields",
+			ref: &ComponentRef{
+				Name:       "gpu-operator",
+				Type:       ComponentTypeOLM,
+				Source:     "https://helm.ngc.nvidia.com/nvidia", // Should be cleared
+				Version:    "v25.10.1",                            // Should be cleared
+				Chart:      "gpu-operator",                        // Should be cleared
+				ValuesFile: "components/gpu-operator/values.yaml", // Should be cleared
+			},
+			config: &ComponentConfig{
+				Name: "gpu-operator",
+				OLM: OLMConfig{
+					RequiredService: OLMRequiredService{
+						Package: "gpu-operator-certified",
+						Version: ">25.0",
+					},
+					DefaultNamespace: "nvidia-gpu-operator",
+					Kinds:            []string{"ClusterPolicy"},
+					ResourcesDir:     "resources",
+				},
+			},
+			expected: ComponentRef{
+				Name:      "gpu-operator",
+				Type:      ComponentTypeOLM,
+				Namespace: "nvidia-gpu-operator",
+				Package:   "gpu-operator-certified",
+				Kinds:     []string{"ClusterPolicy"},
+				// These should be cleared:
+				Source:     "",
+				Version:    "",
+				Chart:      "",
+				ValuesFile: "",
+			},
+		},
+		{
+			name: "OLM component - preserve existing namespace and package",
+			ref: &ComponentRef{
+				Name:      "nfd-operator",
+				Type:      ComponentTypeOLM,
+				Namespace: "custom-nfd-namespace", // Already set, should be preserved
+				Package:   "custom-nfd-package",   // Already set, should be preserved
+			},
+			config: &ComponentConfig{
+				Name: "nfd-operator",
+				OLM: OLMConfig{
+					RequiredService: OLMRequiredService{
+						Package: "nfd",
+						Version: ">4.0",
+					},
+					DefaultNamespace: "openshift-nfd",
+					Kinds:            []string{"NodeFeatureDiscovery"},
+				},
+			},
+			expected: ComponentRef{
+				Name:      "nfd-operator",
+				Type:      ComponentTypeOLM,
+				Namespace: "custom-nfd-namespace", // Preserved
+				Package:   "custom-nfd-package",   // Preserved
+				Kinds:     []string{"NodeFeatureDiscovery"},
+				Source:    "",
+				Version:   "",
+				Chart:     "",
+			},
+		},
+		{
+			name: "Helm component - fields not cleared",
+			ref: &ComponentRef{
+				Name:       "cert-manager",
+				Type:       ComponentTypeHelm,
+				Source:     "https://charts.jetstack.io",
+				Version:    "v1.17.2",
+				Chart:      "cert-manager",
+				ValuesFile: "components/cert-manager/values.yaml",
+			},
+			config: &ComponentConfig{
+				Name: "cert-manager",
+				Helm: HelmConfig{
+					DefaultRepository: "https://charts.jetstack.io",
+					DefaultChart:      "jetstack/cert-manager",
+				},
+			},
+			expected: ComponentRef{
+				Name:       "cert-manager",
+				Type:       ComponentTypeHelm,
+				Source:     "https://charts.jetstack.io",
+				Version:    "v1.17.2",
+				Chart:      "cert-manager",
+				ValuesFile: "components/cert-manager/values.yaml",
+			},
+		},
+		{
+			name: "OLM component - apply kinds from config",
+			ref: &ComponentRef{
+				Name: "test-operator",
+				Type: ComponentTypeOLM,
+			},
+			config: &ComponentConfig{
+				Name: "test-operator",
+				OLM: OLMConfig{
+					RequiredService: OLMRequiredService{
+						Package: "test-operator-certified",
+					},
+					Kinds: []string{"CustomResourceA", "CustomResourceB"},
+				},
+			},
+			expected: ComponentRef{
+				Name:    "test-operator",
+				Type:    ComponentTypeOLM,
+				Package: "test-operator-certified",
+				Kinds:   []string{"CustomResourceA", "CustomResourceB"},
+				Source:  "",
+				Version: "",
+				Chart:   "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.ref.ApplyRegistryDefaults(tt.config)
+
+			// Check basic fields
+			if tt.ref.Name != tt.expected.Name {
+				t.Errorf("Name = %q, want %q", tt.ref.Name, tt.expected.Name)
+			}
+			if tt.ref.Namespace != tt.expected.Namespace {
+				t.Errorf("Namespace = %q, want %q", tt.ref.Namespace, tt.expected.Namespace)
+			}
+			if tt.ref.Package != tt.expected.Package {
+				t.Errorf("Package = %q, want %q", tt.ref.Package, tt.expected.Package)
+			}
+
+			// Check fields that should be cleared for OLM
+			if tt.ref.Source != tt.expected.Source {
+				t.Errorf("Source = %q, want %q", tt.ref.Source, tt.expected.Source)
+			}
+			if tt.ref.Version != tt.expected.Version {
+				t.Errorf("Version = %q, want %q", tt.ref.Version, tt.expected.Version)
+			}
+			if tt.ref.Chart != tt.expected.Chart {
+				t.Errorf("Chart = %q, want %q", tt.ref.Chart, tt.expected.Chart)
+			}
+			if tt.ref.ValuesFile != tt.expected.ValuesFile {
+				t.Errorf("ValuesFile = %q, want %q", tt.ref.ValuesFile, tt.expected.ValuesFile)
+			}
+
+			// Check Kinds array
+			if len(tt.ref.Kinds) != len(tt.expected.Kinds) {
+				t.Errorf("Kinds length = %d, want %d", len(tt.ref.Kinds), len(tt.expected.Kinds))
+			} else {
+				for i, kind := range tt.ref.Kinds {
+					if kind != tt.expected.Kinds[i] {
+						t.Errorf("Kinds[%d] = %q, want %q", i, kind, tt.expected.Kinds[i])
+					}
+				}
+			}
+		})
+	}
+}
+
 // TestComponentRefMergeWithPath verifies that the Path field is correctly merged
 // when merging ComponentRefs (overlay into base).
 func TestComponentRefMergeWithPath(t *testing.T) {

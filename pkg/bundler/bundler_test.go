@@ -1418,7 +1418,7 @@ func TestCollectComponentCustomResources(t *testing.T) {
 				{
 					Name:            "nfd-operator",
 					Type:            recipe.ComponentTypeOLM,
-					CustomResources: []string{"components/nfd-operator/cr-node-feature-discovery.yaml"},
+					CustomResources: []string{"components/nfd-operator/resources/resources-ocp.yaml"},
 				},
 			},
 		}
@@ -1444,12 +1444,12 @@ func TestCollectComponentCustomResources(t *testing.T) {
 				{
 					Name:            "nfd-operator",
 					Type:            recipe.ComponentTypeOLM,
-					CustomResources: []string{"components/nfd-operator/cr-node-feature-discovery.yaml"},
+					CustomResources: []string{"components/nfd-operator/resources/resources-ocp.yaml"},
 				},
 				{
 					Name:            "gpu-operator",
 					Type:            recipe.ComponentTypeOLM,
-					CustomResources: []string{"components/gpu-operator/cr-cluster-policy-ocp.yaml"},
+					CustomResources: []string{"components/gpu-operator/resources/resources-ocp.yaml"},
 				},
 			},
 		}

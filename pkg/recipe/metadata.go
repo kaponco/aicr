@@ -18,6 +18,7 @@ package recipe
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"sort"
 	"strings"
@@ -78,7 +79,7 @@ type ComponentRef struct {
 	Type ComponentType `json:"type" yaml:"type"`
 
 	// Source is the repository URL or OCI reference.
-	Source string `json:"source" yaml:"source"`
+	Source string `json:"source,omitempty" yaml:"source,omitempty"`
 
 	// Version is the chart/component version (for Helm).
 	Version string `json:"version,omitempty" yaml:"version,omitempty"`
@@ -109,6 +110,10 @@ type ComponentRef struct {
 
 	// Package is the OLM package name (for OLM components, e.g., "gpu-operator-certified").
 	Package string `json:"package,omitempty" yaml:"package,omitempty"`
+
+	// Kinds lists the Kubernetes kinds (custom resources) that this OLM operator manages.
+	// Example: ["ClusterPolicy"] for GPU Operator, ["NodeFeatureDiscovery"] for NFD Operator.
+	Kinds []string `json:"kinds,omitempty" yaml:"kinds,omitempty"`
 
 	// CustomResources lists custom resource files to include (for OLM components).
 	// Paths are relative to the data directory.
@@ -251,15 +256,26 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		if ref.Package == "" && config.OLM.RequiredService.Package != "" {
 			ref.Package = config.OLM.RequiredService.Package
 		}
-		if ref.Version == "" && config.OLM.RequiredService.Version != "" {
-			ref.Version = config.OLM.RequiredService.Version
-		}
 		if ref.Namespace == "" && config.OLM.DefaultNamespace != "" {
 			ref.Namespace = config.OLM.DefaultNamespace
 		}
-		if len(ref.CustomResources) == 0 && len(config.OLM.CustomResources) > 0 {
-			ref.CustomResources = config.OLM.CustomResources
+		if len(ref.Kinds) == 0 && len(config.OLM.Kinds) > 0 {
+			ref.Kinds = config.OLM.Kinds
 		}
+		// Auto-discover custom resources from resources directory
+		if len(ref.CustomResources) == 0 {
+			resourcesDir := config.OLM.ResourcesDir
+			if resourcesDir == "" {
+				resourcesDir = "resources"
+			}
+			resourcesPath := fmt.Sprintf("components/%s/%s", ref.Name, resourcesDir)
+			ref.CustomResources = discoverCustomResources(resourcesPath)
+		}
+		// Clear Helm/Kustomize-specific fields that don't apply to OLM components
+		ref.Source = ""
+		ref.Chart = ""
+		ref.Version = ""
+		ref.ValuesFile = ""
 	}
 
 	// NOTE: healthCheck.assertFile content is intentionally NOT loaded here.
@@ -268,6 +284,42 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 	// content would activate chainsaw-based checks in expected-resources, causing
 	// runtime failures. Health check files are used by the conformance validator,
 	// which has its own chainsaw execution path.
+}
+
+// discoverCustomResources scans a directory for custom resource files.
+// Returns paths to all .yaml and .yml files found in the directory.
+// Returns empty slice if directory doesn't exist or is empty.
+func discoverCustomResources(dirPath string) []string {
+	provider := GetDataProvider()
+	if provider == nil {
+		return nil
+	}
+
+	var resources []string
+
+	// Walk the directory to find all YAML files
+	_ = provider.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			// Directory doesn't exist or other error - skip
+			return nil
+		}
+
+		// Skip directories
+		if d.IsDir() {
+			return nil
+		}
+
+		// Include only YAML files
+		name := d.Name()
+		if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
+			resources = append(resources, path)
+		}
+
+		return nil
+	})
+
+	sort.Strings(resources) // Deterministic order
+	return resources
 }
 
 // RecipeMetadataSpec contains the specification for a recipe.
