@@ -482,9 +482,7 @@ kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/manifests/" --ignore-not-found || t
 {{- $compNS := .Namespace }}
 echo "Uninstalling {{ .Name }} ({{ .Namespace }}) via OLM custom resources..."
 cd "${SCRIPT_DIR}/{{ .Name }}"
-{{- range .CustomResources }}
-kubectl delete -f {{ .Filename }} -n {{ $compNS }} --ignore-not-found || true
-{{- end }}
+kubectl delete -f resources.yaml -n {{ $compNS }} --ignore-not-found || true
 cd - >/dev/null
 {{ else if .IsKustomize -}}
 echo "Uninstalling {{ .Name }} ({{ .Namespace }}) via kustomize..."

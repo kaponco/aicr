@@ -1026,7 +1026,8 @@ func (b *DefaultBundler) collectComponentCustomResources(ctx context.Context, re
 
 		componentCRs := make(map[string][]byte, len(ref.CustomResources))
 		for _, crPath := range ref.CustomResources {
-			content, err := recipe.GetManifestContent(crPath)
+			// Use merged content (base + overlay) instead of raw file content
+			content, err := recipe.GetMergedCustomResource(crPath)
 			if err != nil {
 				return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to load custom resource %s for component %s", crPath, ref.Name), err)
 			}

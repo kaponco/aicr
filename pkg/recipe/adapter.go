@@ -18,6 +18,8 @@ package recipe
 import (
 	"embed"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	"github.com/NVIDIA/aicr/pkg/errors"
 	"github.com/NVIDIA/aicr/recipes"
@@ -35,6 +37,94 @@ func GetEmbeddedFS() embed.FS {
 func GetManifestContent(path string) ([]byte, error) {
 	provider := GetDataProvider()
 	return provider.ReadFile(path)
+}
+
+// GetMergedCustomResource retrieves and merges a custom resource file with its base (if applicable).
+// For overlay files (e.g., resources-ocp-training.yaml), it loads the base file (e.g., resources-ocp.yaml),
+// merges it with the overlay, and returns the merged YAML.
+// For base files or files without a base, it returns the content as-is.
+//
+// Path should be relative to data directory (e.g., "components/gpu-operator/resources/resources-ocp-training.yaml").
+func GetMergedCustomResource(path string) ([]byte, error) {
+	provider := GetDataProvider()
+
+	// Try to determine if this is an overlay file and find its base
+	basePath := deriveBaseResourcePath(path)
+
+	// If no base path found or it's the same as the current path, just return the file content
+	if basePath == "" || basePath == path {
+		return provider.ReadFile(path)
+	}
+
+	// Try to load base file
+	baseData, err := provider.ReadFile(basePath)
+	if err != nil {
+		// Base file doesn't exist, just return overlay content as-is
+		return provider.ReadFile(path)
+	}
+
+	// Load overlay file
+	overlayData, err := provider.ReadFile(path)
+	if err != nil {
+		return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to read overlay resource file %q", path), err)
+	}
+
+	// Parse base YAML
+	var baseContent map[string]any
+	err = yaml.Unmarshal(baseData, &baseContent)
+	if err != nil {
+		return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to parse base resource file %q", basePath), err)
+	}
+
+	// Parse overlay YAML
+	var overlayContent map[string]any
+	err = yaml.Unmarshal(overlayData, &overlayContent)
+	if err != nil {
+		return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to parse overlay resource file %q", path), err)
+	}
+
+	// Merge overlay into base (overlay takes precedence)
+	mergeValues(baseContent, overlayContent)
+
+	// Marshal merged content back to YAML
+	mergedData, err := yaml.Marshal(baseContent)
+	if err != nil {
+		return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to marshal merged resource for %q", path), err)
+	}
+
+	return mergedData, nil
+}
+
+// deriveBaseResourcePath attempts to find the base resource file path for an overlay file.
+// For example, "components/gpu-operator/resources/resources-ocp-training.yaml" would return
+// "components/gpu-operator/resources/resources-ocp.yaml".
+// Returns empty string if no base path can be derived.
+func deriveBaseResourcePath(overlayPath string) string {
+	// Extract directory and filename
+	dir := filepath.Dir(overlayPath)
+	filename := filepath.Base(overlayPath)
+
+	// Check if filename matches pattern: resources-<criteria>.yaml or resources-<criteria>.yml
+	if !strings.HasPrefix(filename, "resources-") {
+		return "" // Not a resource file we recognize
+	}
+
+	// Remove extension
+	ext := filepath.Ext(filename)
+	nameWithoutExt := strings.TrimSuffix(filename, ext)
+
+	// Split by dashes: resources-ocp-training → [resources, ocp, training]
+	parts := strings.Split(nameWithoutExt, "-")
+	if len(parts) <= 2 {
+		// Only "resources-ocp" or less, this is likely already a base file
+		return ""
+	}
+
+	// Remove last part to get base: [resources, ocp, training] → [resources, ocp]
+	baseParts := parts[:len(parts)-1]
+	baseName := strings.Join(baseParts, "-") + ext
+
+	return filepath.Join(dir, baseName)
 }
 
 // RecipeInput is an interface that both Recipe and RecipeResult implement.

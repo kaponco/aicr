@@ -2391,15 +2391,15 @@ func TestWriteCustomResources(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:          "multiple custom resources",
+			name:          "multiple custom resources - only most specific written",
 			componentName: "gpu-operator",
 			componentCustomResources: map[string]map[string][]byte{
 				"gpu-operator": {
-					"components/gpu-operator/cr-cluster-policy.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\n"),
-					"components/gpu-operator/cr-dcgm-config.yaml":    []byte("apiVersion: nvidia.com/v1\nkind: DCGMConfig\n"),
+					"components/gpu-operator/resources/resources-ocp.yaml":          []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\n"),
+					"components/gpu-operator/resources/resources-ocp-training.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\nspec:\n  mig:\n    strategy: mixed\n"),
 				},
 			},
-			wantFiles: 2,
+			wantFiles: 1, // Only writes the most specific (longest filename) as resources.yaml
 			wantErr:   false,
 		},
 	}
@@ -2426,11 +2426,21 @@ func TestWriteCustomResources(t *testing.T) {
 				}
 			}
 
-			// Verify totalSize matches actual content
+			// Verify totalSize matches the most specific file content
+			// (longest filename = most specific, which is what gets written)
 			var expectedSize int64
 			if crs, ok := tt.componentCustomResources[tt.componentName]; ok {
-				for _, content := range crs {
-					expectedSize += int64(len(content))
+				var longestPath string
+				var maxLen int
+				for p := range crs {
+					filename := filepath.Base(p)
+					if len(filename) > maxLen {
+						maxLen = len(filename)
+						longestPath = p
+					}
+				}
+				if longestPath != "" {
+					expectedSize = int64(len(crs[longestPath]))
 				}
 			}
 			if totalSize != expectedSize {
@@ -2483,7 +2493,7 @@ func TestGenerate_OLMComponents(t *testing.T) {
 			DeploymentOrder: []string{"nfd-operator", "gpu-operator"},
 		},
 		ComponentValues: map[string]map[string]any{
-			"nfd-operator":  {},
+			"nfd-operator": {},
 			"gpu-operator": {},
 		},
 		ComponentCustomResources: map[string]map[string][]byte{
@@ -2507,15 +2517,15 @@ func TestGenerate_OLMComponents(t *testing.T) {
 		t.Fatal("Generate() returned nil output")
 	}
 
-	// Verify OLM custom resources were written
-	nfdCR := filepath.Join(outputDir, "nfd-operator", "cr-node-feature-discovery.yaml")
-	if _, err := os.Stat(nfdCR); err != nil {
-		t.Errorf("NFD custom resource not found: %v", err)
+	// Verify OLM custom resources were written as resources.yaml
+	nfdCR := filepath.Join(outputDir, "nfd-operator", "resources.yaml")
+	if _, statErr := os.Stat(nfdCR); statErr != nil {
+		t.Errorf("NFD custom resource not found: %v", statErr)
 	}
 
-	gpuCR := filepath.Join(outputDir, "gpu-operator", "cr-cluster-policy-ocp.yaml")
-	if _, err := os.Stat(gpuCR); err != nil {
-		t.Errorf("GPU Operator custom resource not found: %v", err)
+	gpuCR := filepath.Join(outputDir, "gpu-operator", "resources.yaml")
+	if _, statErr := os.Stat(gpuCR); statErr != nil {
+		t.Errorf("GPU Operator custom resource not found: %v", statErr)
 	}
 
 	// Verify READMEs contain OLM deployment instructions
@@ -2527,8 +2537,8 @@ func TestGenerate_OLMComponents(t *testing.T) {
 	if !strings.Contains(string(readmeContent), "OLM (Operator Lifecycle Manager)") {
 		t.Error("NFD README does not mention OLM")
 	}
-	if !strings.Contains(string(readmeContent), "kubectl apply -f cr-node-feature-discovery.yaml") {
-		t.Error("NFD README does not contain kubectl apply command")
+	if !strings.Contains(string(readmeContent), "kubectl apply -f resources.yaml") {
+		t.Error("NFD README does not contain kubectl apply command for resources.yaml")
 	}
 
 	// Verify deploy.sh contains OLM deployment commands
@@ -2540,7 +2550,7 @@ func TestGenerate_OLMComponents(t *testing.T) {
 	if !strings.Contains(string(deployContent), "Installing nfd-operator") {
 		t.Error("deploy.sh does not mention nfd-operator installation")
 	}
-	if !strings.Contains(string(deployContent), "kubectl apply -f cr-node-feature-discovery.yaml -n openshift-nfd") {
+	if !strings.Contains(string(deployContent), "kubectl apply -f resources.yaml -n openshift-nfd") {
 		t.Error("deploy.sh does not contain NFD custom resource application with namespace")
 	}
 
@@ -2553,7 +2563,7 @@ func TestGenerate_OLMComponents(t *testing.T) {
 	if !strings.Contains(string(undeployContent), "Uninstalling gpu-operator") {
 		t.Error("undeploy.sh does not mention gpu-operator uninstallation")
 	}
-	if !strings.Contains(string(undeployContent), "kubectl delete -f cr-cluster-policy-ocp.yaml -n nvidia-gpu-operator") {
+	if !strings.Contains(string(undeployContent), "kubectl delete -f resources.yaml -n nvidia-gpu-operator") {
 		t.Error("undeploy.sh does not contain GPU Operator custom resource deletion with namespace")
 	}
 }

@@ -17,27 +17,21 @@ Namespace: {{ .Namespace }}
 kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl apply -f -
 
 # Apply custom resources
-{{- range .CustomResources }}
-kubectl apply -f {{ .Filename }} -n {{ $.Namespace }}
-{{- end }}
+kubectl apply -f resources.yaml -n {{ .Namespace }}
 ```
 
 ## Verify
 
 ```bash
 # Check custom resources
-{{- range .CustomResources }}
-kubectl get -f {{ .Filename }} -n {{ $.Namespace }}
-{{- end }}
+kubectl get -f resources.yaml -n {{ .Namespace }}
 ```
 
 ## Undeploy
 
 ```bash
 # Delete custom resources
-{{- range .CustomResources }}
-kubectl delete -f {{ .Filename }} -n {{ $.Namespace }} --ignore-not-found
-{{- end }}
+kubectl delete -f resources.yaml -n {{ .Namespace }} --ignore-not-found
 ```
 {{ else if .IsKustomize -}}
 Source: {{ .Repository }}

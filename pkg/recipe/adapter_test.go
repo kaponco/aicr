@@ -16,7 +16,9 @@ package recipe
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 const testVersionV2 = "v2.0"
@@ -607,4 +609,211 @@ func Test_hasComponentRefs(t *testing.T) {
 			t.Error("expected false for Recipe")
 		}
 	})
+}
+
+func TestDeriveBaseResourcePath(t *testing.T) {
+	tests := []struct {
+		name         string
+		overlayPath  string
+		expectedBase string
+	}{
+		{
+			name:         "overlay with two-part criteria",
+			overlayPath:  "components/gpu-operator/resources/resources-ocp-training.yaml",
+			expectedBase: "components/gpu-operator/resources/resources-ocp.yaml",
+		},
+		{
+			name:         "overlay with three-part criteria",
+			overlayPath:  "components/gpu-operator/resources/resources-ocp-a100-training.yaml",
+			expectedBase: "components/gpu-operator/resources/resources-ocp-a100.yaml",
+		},
+		{
+			name:         "base file (two parts total) - no base",
+			overlayPath:  "components/gpu-operator/resources/resources-ocp.yaml",
+			expectedBase: "",
+		},
+		{
+			name:         "yml extension",
+			overlayPath:  "components/nfd-operator/resources/resources-ocp-training.yml",
+			expectedBase: "components/nfd-operator/resources/resources-ocp.yml",
+		},
+		{
+			name:         "not a resources file",
+			overlayPath:  "components/gpu-operator/manifests/dcgm-exporter.yaml",
+			expectedBase: "",
+		},
+		{
+			name:         "single part (just resources.yaml) - no base",
+			overlayPath:  "components/test/resources/resources.yaml",
+			expectedBase: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := deriveBaseResourcePath(tt.overlayPath)
+			if result != tt.expectedBase {
+				t.Errorf("deriveBaseResourcePath(%q) = %q, want %q", tt.overlayPath, result, tt.expectedBase)
+			}
+		})
+	}
+}
+
+func TestGetMergedCustomResource(t *testing.T) {
+	tests := []struct {
+		name          string
+		files         map[string]string
+		resourcePath  string
+		expectMerged  bool
+		checkContains []string
+		wantErr       bool
+	}{
+		{
+			name: "overlay with base - should merge",
+			files: map[string]string{
+				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  driver:
+    enabled: true
+    version: "570.86.15"
+  dcgm:
+    enabled: true`,
+				"components/gpu-operator/resources/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  dcgm:
+    enabled: true
+  mig:
+    strategy: mixed`,
+			},
+			resourcePath: "components/gpu-operator/resources/resources-ocp-training.yaml",
+			expectMerged: true,
+			checkContains: []string{
+				"version: 570.86.15", // From base
+				"strategy: mixed",    // From overlay
+			},
+		},
+		{
+			name: "base file only - return as-is",
+			files: map[string]string{
+				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  driver:
+    enabled: true`,
+			},
+			resourcePath: "components/gpu-operator/resources/resources-ocp.yaml",
+			expectMerged: false,
+			checkContains: []string{
+				"enabled: true",
+			},
+		},
+		{
+			name: "overlay without base - return overlay as-is",
+			files: map[string]string{
+				"components/nfd-operator/resources/resources-ocp-training.yaml": `apiVersion: nfd.openshift.io/v1
+kind: NodeFeatureDiscovery
+metadata:
+  name: nfd-instance`,
+			},
+			resourcePath: "components/nfd-operator/resources/resources-ocp-training.yaml",
+			expectMerged: false,
+			checkContains: []string{
+				"nfd-instance",
+			},
+		},
+		{
+			name:         "nonexistent file - error",
+			files:        map[string]string{},
+			resourcePath: "components/nonexistent/resources/resources-ocp.yaml",
+			wantErr:      true,
+		},
+		{
+			name: "invalid YAML in base file - error",
+			files: map[string]string{
+				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  driver: [invalid yaml structure`,
+				"components/gpu-operator/resources/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  mig:
+    strategy: mixed`,
+			},
+			resourcePath: "components/gpu-operator/resources/resources-ocp-training.yaml",
+			wantErr:      true,
+		},
+		{
+			name: "invalid YAML in overlay file - error",
+			files: map[string]string{
+				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  driver:
+    enabled: true`,
+				"components/gpu-operator/resources/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata: [invalid yaml structure
+spec:
+  mig:
+    strategy: mixed`,
+			},
+			resourcePath: "components/gpu-operator/resources/resources-ocp-training.yaml",
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test filesystem
+			fs := make(fstest.MapFS)
+			for path, content := range tt.files {
+				fs[path] = &fstest.MapFile{
+					Data: []byte(content),
+				}
+			}
+
+			// Set up test data provider
+			old := GetDataProvider()
+			SetDataProvider(&testFSProvider{fs: fs})
+			defer SetDataProvider(old)
+
+			// Test GetMergedCustomResource
+			result, err := GetMergedCustomResource(tt.resourcePath)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			resultStr := string(result)
+
+			// Check for expected content
+			for _, expected := range tt.checkContains {
+				if !strings.Contains(resultStr, expected) {
+					t.Errorf("result should contain %q, got:\n%s", expected, resultStr)
+				}
+			}
+		})
+	}
 }

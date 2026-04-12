@@ -1359,7 +1359,7 @@ func TestDiscoverCustomResources(t *testing.T) {
 			name:    "directory with subdirectories - only files at root level",
 			dirPath: "components/nested/resources",
 			files: map[string]string{
-				"components/nested/resources/root.yaml":         "kind: Root",
+				"components/nested/resources/root.yaml":          "kind: Root",
 				"components/nested/resources/subdir/nested.yaml": "kind: Nested",
 			},
 			expected: []string{
@@ -1417,7 +1417,7 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 			ref: &ComponentRef{
 				Name:       "gpu-operator",
 				Type:       ComponentTypeOLM,
-				Source:     "https://helm.ngc.nvidia.com/nvidia", // Should be cleared
+				Source:     "https://helm.ngc.nvidia.com/nvidia",  // Should be cleared
 				Version:    "v25.10.1",                            // Should be cleared
 				Chart:      "gpu-operator",                        // Should be cleared
 				ValuesFile: "components/gpu-operator/values.yaml", // Should be cleared

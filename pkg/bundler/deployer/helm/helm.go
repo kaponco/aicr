@@ -407,44 +407,45 @@ func (g *Generator) generateComponentDirectories(ctx context.Context, components
 	return files, totalSize, nil
 }
 
-// writeCustomResources writes custom resource files for an OLM component.
+// writeCustomResources writes a single merged custom resource file for an OLM component.
+// If multiple custom resources are provided (e.g., base + overlay), it uses the most specific
+// one (last after sorting) which already contains merged content, and writes it as "resources.yaml".
 func (g *Generator) writeCustomResources(componentName, componentDir string, componentCustomResources map[string]map[string][]byte) ([]string, int64, error) {
 	customResources, ok := componentCustomResources[componentName]
 	if !ok || len(customResources) == 0 {
 		return nil, 0, nil
 	}
 
-	// Sort CR paths for deterministic output
-	crPaths := make([]string, 0, len(customResources))
+	// Find the most specific custom resource (longest filename = most criteria)
+	// e.g., resources-ocp-training.yaml is more specific than resources-ocp.yaml
+	// The most specific one already contains merged content from GetMergedCustomResource
+	var mostSpecificPath string
+	var maxLen int
 	for p := range customResources {
-		crPaths = append(crPaths, p)
-	}
-	sort.Strings(crPaths)
-
-	var files []string
-	var totalSize int64
-
-	for _, crPath := range crPaths {
-		content := customResources[crPath]
-		filename := filepath.Base(crPath)
-		outputPath, pathErr := shared.SafeJoin(componentDir, filename)
-		if pathErr != nil {
-			return nil, 0, errors.New(errors.ErrCodeInvalidRequest,
-				fmt.Sprintf("invalid custom resource filename %q in component %s", filename, componentName))
+		filename := filepath.Base(p)
+		if len(filename) > maxLen {
+			maxLen = len(filename)
+			mostSpecificPath = p
 		}
-
-		if err := os.WriteFile(outputPath, content, 0600); err != nil {
-			return nil, 0, errors.WrapWithContext(errors.ErrCodeInternal, "failed to write custom resource", err,
-				map[string]any{"component": componentName, "filename": filename})
-		}
-
-		files = append(files, outputPath)
-		totalSize += int64(len(content))
-
-		slog.Debug("wrote custom resource", "component", componentName, "filename", filename)
 	}
 
-	return files, totalSize, nil
+	content := customResources[mostSpecificPath]
+
+	// Always write as "resources.yaml" for consistency
+	outputPath, pathErr := shared.SafeJoin(componentDir, "resources.yaml")
+	if pathErr != nil {
+		return nil, 0, errors.New(errors.ErrCodeInvalidRequest,
+			fmt.Sprintf("invalid custom resource path for component %s", componentName))
+	}
+
+	if err := os.WriteFile(outputPath, content, 0600); err != nil {
+		return nil, 0, errors.WrapWithContext(errors.ErrCodeInternal, "failed to write custom resource", err,
+			map[string]any{"component": componentName, "filename": "resources.yaml"})
+	}
+
+	slog.Debug("wrote merged custom resource", "component", componentName, "source", filepath.Base(mostSpecificPath), "output", "resources.yaml")
+
+	return []string{outputPath}, int64(len(content)), nil
 }
 
 // generateRootREADME creates the root README.md with deployment instructions.
