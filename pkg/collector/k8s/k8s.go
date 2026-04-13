@@ -68,6 +68,10 @@ func (k *Collector) Collect(ctx context.Context) (*measurement.Measurement, erro
 		return k.collectNode(ctx)
 	})
 
+	crds := collectSafe("crd", func() (map[string]measurement.Reading, error) {
+		return k.collectCRDs(ctx)
+	})
+
 	res := measurement.NewMeasurement(measurement.TypeK8s).
 		WithSubtypeBuilder(
 			measurement.NewSubtypeBuilder("server").Set(measurement.KeyVersion, versions[measurement.KeyVersion]).
@@ -77,6 +81,7 @@ func (k *Collector) Collect(ctx context.Context) (*measurement.Measurement, erro
 		WithSubtype(measurement.Subtype{Name: "image", Data: images}).
 		WithSubtype(measurement.Subtype{Name: "policy", Data: policies}).
 		WithSubtype(measurement.Subtype{Name: "node", Data: node}).
+		WithSubtype(measurement.Subtype{Name: "crd", Data: crds}).
 		Build()
 
 	return res, nil
@@ -103,6 +108,7 @@ func emptyK8sMeasurement() *measurement.Measurement {
 		WithSubtype(measurement.Subtype{Name: "image", Data: empty}).
 		WithSubtype(measurement.Subtype{Name: "policy", Data: empty}).
 		WithSubtype(measurement.Subtype{Name: "node", Data: empty}).
+		WithSubtype(measurement.Subtype{Name: "crd", Data: empty}).
 		Build()
 }
 
