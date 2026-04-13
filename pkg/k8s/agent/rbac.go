@@ -142,6 +142,11 @@ func (d *Deployer) ensureClusterRole(ctx context.Context) error {
 			Resources: []string{"clusterpolicies"},
 			Verbs:     []string{"get", "list"},
 		},
+		{
+			APIGroups: []string{"apiextensions.k8s.io"},
+			Resources: []string{"customresourcedefinitions"},
+			Verbs:     []string{"get", "list"},
+		},
 	}
 
 	cr := &rbacv1.ClusterRole{
