@@ -1425,10 +1425,6 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 			config: &ComponentConfig{
 				Name: "gpu-operator",
 				OLM: OLMConfig{
-					RequiredService: OLMRequiredService{
-						Package: "gpu-operator-certified",
-						Version: ">25.0",
-					},
 					DefaultNamespace: "nvidia-gpu-operator",
 					Kinds:            []string{"ClusterPolicy"},
 					ResourcesDir:     "resources",
@@ -1438,7 +1434,6 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 				Name:      "gpu-operator",
 				Type:      ComponentTypeOLM,
 				Namespace: "nvidia-gpu-operator",
-				Package:   "gpu-operator-certified",
 				Kinds:     []string{"ClusterPolicy"},
 				// These should be cleared:
 				Source:     "",
@@ -1448,20 +1443,15 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 			},
 		},
 		{
-			name: "OLM component - preserve existing namespace and package",
+			name: "OLM component - preserve existing namespace",
 			ref: &ComponentRef{
 				Name:      "nfd-operator",
 				Type:      ComponentTypeOLM,
 				Namespace: "custom-nfd-namespace", // Already set, should be preserved
-				Package:   "custom-nfd-package",   // Already set, should be preserved
 			},
 			config: &ComponentConfig{
 				Name: "nfd-operator",
 				OLM: OLMConfig{
-					RequiredService: OLMRequiredService{
-						Package: "nfd",
-						Version: ">4.0",
-					},
 					DefaultNamespace: "openshift-nfd",
 					Kinds:            []string{"NodeFeatureDiscovery"},
 				},
@@ -1470,7 +1460,6 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 				Name:      "nfd-operator",
 				Type:      ComponentTypeOLM,
 				Namespace: "custom-nfd-namespace", // Preserved
-				Package:   "custom-nfd-package",   // Preserved
 				Kinds:     []string{"NodeFeatureDiscovery"},
 				Source:    "",
 				Version:   "",
@@ -1512,16 +1501,12 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 			config: &ComponentConfig{
 				Name: "test-operator",
 				OLM: OLMConfig{
-					RequiredService: OLMRequiredService{
-						Package: "test-operator-certified",
-					},
 					Kinds: []string{"CustomResourceA", "CustomResourceB"},
 				},
 			},
 			expected: ComponentRef{
 				Name:    "test-operator",
 				Type:    ComponentTypeOLM,
-				Package: "test-operator-certified",
 				Kinds:   []string{"CustomResourceA", "CustomResourceB"},
 				Source:  "",
 				Version: "",
@@ -1540,9 +1525,6 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 			}
 			if tt.ref.Namespace != tt.expected.Namespace {
 				t.Errorf("Namespace = %q, want %q", tt.ref.Namespace, tt.expected.Namespace)
-			}
-			if tt.ref.Package != tt.expected.Package {
-				t.Errorf("Package = %q, want %q", tt.ref.Package, tt.expected.Package)
 			}
 
 			// Check fields that should be cleared for OLM

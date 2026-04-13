@@ -30,6 +30,14 @@ spec:
     - name: K8s.server.version
       value: ">= 1.30"
 
+    # Verify NVIDIA GPU Operator ClusterPolicy CRD is established
+    - name: K8s.crd.clusterpolicies.nvidia.com.established
+      value: "true"
+
+    # Verify NFD Operator NodeFeatureDiscovery CRD is established
+    - name: K8s.crd.nodefeaturediscoveries.nfd.openshift.io.established
+      value: "true"
+
   # OCP-specific components deployed via OLM
   componentRefs:
     # NFD Operator deployed via OLM (Operator Lifecycle Manager)

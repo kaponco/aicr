@@ -33,8 +33,8 @@ func TestKubernetesCollector_Collect(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, m)
 	assert.Equal(t, measurement.TypeK8s, m.Type)
-	// Should have 4 subtypes: server, image, policy, node
-	assert.Len(t, m.Subtypes, 4)
+	// Should have 5 subtypes: server, image, policy, node, crd
+	assert.Len(t, m.Subtypes, 5)
 
 	// Find the server subtype
 	var serverSubtype *measurement.Subtype
@@ -107,7 +107,7 @@ func TestKubernetesCollector_ErrorRecovery_NilClient(t *testing.T) {
 	assert.NotNil(t, m)
 	assert.Equal(t, measurement.TypeK8s, m.Type)
 	// All subtypes should be present but with empty data
-	assert.Len(t, m.Subtypes, 4)
+	assert.Len(t, m.Subtypes, 5)
 }
 
 // Helper function defined in image_test.go

@@ -253,9 +253,6 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		}
 	case ComponentTypeOLM:
 		// Apply OLM defaults
-		if ref.Package == "" && config.OLM.RequiredService.Package != "" {
-			ref.Package = config.OLM.RequiredService.Package
-		}
 		if ref.Namespace == "" && config.OLM.DefaultNamespace != "" {
 			ref.Namespace = config.OLM.DefaultNamespace
 		}
@@ -264,11 +261,14 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		}
 		// Auto-discover custom resources from resources directory
 		if len(ref.CustomResources) == 0 {
-			resourcesDir := config.OLM.ResourcesDir
-			if resourcesDir == "" {
-				resourcesDir = "resources"
+			var resourcesPath string
+			if config.OLM.ResourcesDir != "" {
+				// Use full path from registry
+				resourcesPath = config.OLM.ResourcesDir
+			} else {
+				// Fallback to default relative path
+				resourcesPath = fmt.Sprintf("components/%s/resources", ref.Name)
 			}
-			resourcesPath := fmt.Sprintf("components/%s/%s", ref.Name, resourcesDir)
 			ref.CustomResources = discoverCustomResources(resourcesPath)
 		}
 		// Clear Helm/Kustomize-specific fields that don't apply to OLM components

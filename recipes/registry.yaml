@@ -76,13 +76,10 @@ components:
     healthCheck:
       assertFile: checks/nfd-operator/health-check.yaml
     olm:
-      requiredService:
-        package: nfd
-        version: ">4.0"
       defaultNamespace: openshift-nfd
       kinds:
         - NodeFeatureDiscovery
-      resourcesDir: resources
+      resourcesDir: recipes/components/nfd-operator/resources
     nodeScheduling:
       system:
         nodeSelectorPaths:
@@ -110,13 +107,10 @@ components:
       defaultChart: nvidia/gpu-operator
       defaultNamespace: gpu-operator
     olm:
-      requiredService:
-        package: gpu-operator-certified
-        version: ">25.0"
       defaultNamespace: nvidia-gpu-operator
       kinds:
         - ClusterPolicy
-      resourcesDir: resources
+      resourcesDir: recipes/components/gpu-operator/resources
     nodeScheduling:
       system:
         nodeSelectorPaths:

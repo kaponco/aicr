@@ -4,11 +4,12 @@
 ## Deployment Type
 OLM (Operator Lifecycle Manager)
 
-Package: {{ .OLMPackage }}
+{{ if .OLMPackage -}}Package: {{ .OLMPackage }}
+{{ end -}}
 {{ if .OLMVersion -}}Version: {{ .OLMVersion }}{{ end }}
 Namespace: {{ .Namespace }}
 
-**Prerequisites:** The {{ .OLMPackage }} operator must be pre-installed in the cluster via OLM.
+**Prerequisites:** This component requires an OLM operator to be pre-installed in the cluster.
 
 ## Deploy
 

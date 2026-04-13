@@ -79,6 +79,7 @@ func TestIsAllowedCRDGroup(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := isAllowedCRDGroup(tt.group, allowlist)
 			if result != tt.expected {
 				t.Errorf("isAllowedCRDGroup(%q) = %v, want %v", tt.group, result, tt.expected)
@@ -148,6 +149,7 @@ func TestIsCRDEstablished(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			crd := &apiextv1.CustomResourceDefinition{
 				Status: apiextv1.CustomResourceDefinitionStatus{
 					Conditions: tt.conditions,
@@ -183,6 +185,7 @@ func TestBoolToString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			result := boolToString(tt.input)
 			if result != tt.expected {
 				t.Errorf("boolToString(%v) = %q, want %q", tt.input, result, tt.expected)

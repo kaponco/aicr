@@ -105,9 +105,6 @@ type KustomizeConfig struct {
 
 // OLMConfig contains default OLM (Operator Lifecycle Manager) settings for a component.
 type OLMConfig struct {
-	// RequiredService contains package and version information for OLM operators.
-	RequiredService OLMRequiredService `yaml:"requiredService,omitempty"`
-
 	// DefaultNamespace is the Kubernetes namespace for deploying this component via OLM.
 	DefaultNamespace string `yaml:"defaultNamespace,omitempty"`
 
@@ -118,16 +115,6 @@ type OLMConfig struct {
 	// ResourcesDir is the directory containing custom resource files (relative to component directory).
 	// Defaults to "resources" if not specified. Files are auto-discovered from this directory.
 	ResourcesDir string `yaml:"resourcesDir,omitempty"`
-}
-
-// OLMRequiredService contains package and version requirements for OLM operators.
-type OLMRequiredService struct {
-	// Package is the OLM package name (e.g., "gpu-operator-certified").
-	Package string `yaml:"package,omitempty"`
-
-	// Version is the required version constraint (e.g., ">25.0").
-	// Note: Semantic version validation is not yet implemented.
-	Version string `yaml:"version,omitempty"`
 }
 
 // NodeSchedulingConfig defines paths for node scheduling injection.
@@ -334,7 +321,7 @@ func (r *ComponentRegistry) Validate() []error {
 	for i, comp := range r.Components {
 		hasHelm := comp.Helm.DefaultRepository != "" || comp.Helm.DefaultChart != ""
 		hasKustomize := comp.Kustomize.DefaultSource != ""
-		hasOLM := comp.OLM.RequiredService.Package != ""
+		hasOLM := len(comp.OLM.Kinds) > 0
 
 		// Kustomize cannot coexist with Helm or OLM
 		if hasKustomize && (hasHelm || hasOLM) {
@@ -410,14 +397,14 @@ func (c *ComponentConfig) GetValidations() []ComponentValidationConfig {
 }
 
 // GetType returns the component deployment type based on which config is present.
-// Returns ComponentTypeOLM if OLM.RequiredService.Package is set,
+// Returns ComponentTypeOLM if OLM.Kinds is non-empty,
 // ComponentTypeKustomize if Kustomize.DefaultSource is set,
 // otherwise returns ComponentTypeHelm (the default).
 func (c *ComponentConfig) GetType() ComponentType {
 	if c == nil {
 		return ComponentTypeHelm
 	}
-	if c.OLM.RequiredService.Package != "" {
+	if len(c.OLM.Kinds) > 0 {
 		return ComponentTypeOLM
 	}
 	if c.Kustomize.DefaultSource != "" {

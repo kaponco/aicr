@@ -645,11 +645,8 @@ func TestComponentConfig_GetType(t *testing.T) {
 			config: &ComponentConfig{
 				Name: "test",
 				OLM: OLMConfig{
-					RequiredService: OLMRequiredService{
-						Package: "test-operator-certified",
-						Version: ">1.0",
-					},
 					DefaultNamespace: "test-namespace",
+					Kinds:            []string{"TestResource"},
 				},
 			},
 			expected: ComponentTypeOLM,
@@ -663,9 +660,7 @@ func TestComponentConfig_GetType(t *testing.T) {
 					DefaultChart:      "example/chart",
 				},
 				OLM: OLMConfig{
-					RequiredService: OLMRequiredService{
-						Package: "test-operator-certified",
-					},
+					Kinds: []string{"TestResource"},
 				},
 			},
 			expected: ComponentTypeOLM,

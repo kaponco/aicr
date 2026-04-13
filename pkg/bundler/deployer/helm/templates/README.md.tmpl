@@ -23,7 +23,7 @@ The following components are included (deployed in order):
 |-----------|------|---------|-----------|--------|
 {{ range .Components -}}
 {{ if .IsOLM -}}
-| {{ .Name }} | OLM | {{ .OLMVersion }} | {{ .Namespace }} | {{ .OLMPackage }} |
+| {{ .Name }} | OLM | {{ .OLMVersion }} | {{ .Namespace }} | {{ if .OLMPackage }}{{ .OLMPackage }}{{ else }}OLM Operator{{ end }} |
 {{ else if .IsKustomize -}}
 | {{ .Name }} | Kustomize | {{ .Tag }} | {{ .Namespace }} | {{ .Repository }} ({{ .Path }}) |
 {{ else if .HasChart -}}
