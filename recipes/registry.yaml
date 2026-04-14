@@ -77,9 +77,11 @@ components:
       assertFile: checks/nfd-operator/health-check.yaml
     olm:
       defaultNamespace: openshift-nfd
+      installFiles:
+        - components/nfd-operator/olm/install.yaml
+      resourcesDir: components/nfd-operator/resources
       kinds:
         - NodeFeatureDiscovery
-      resourcesDir: recipes/components/nfd-operator/resources
     nodeScheduling:
       system:
         nodeSelectorPaths:
@@ -108,9 +110,11 @@ components:
       defaultNamespace: gpu-operator
     olm:
       defaultNamespace: nvidia-gpu-operator
+      installFiles:
+        - components/gpu-operator/olm/install.yaml
       kinds:
         - ClusterPolicy
-      resourcesDir: recipes/components/gpu-operator/resources
+      resourcesDir: components/gpu-operator/resources
     nodeScheduling:
       system:
         nodeSelectorPaths:

@@ -111,6 +111,15 @@ type ComponentRef struct {
 	// Package is the OLM package name (for OLM components, e.g., "gpu-operator-certified").
 	Package string `json:"package,omitempty" yaml:"package,omitempty"`
 
+	// InstallFiles lists OLM installation manifest files to include (for OLM components).
+	// These files typically contain OperatorGroup, Subscription, and other OLM resources.
+	// Paths are relative to the data directory.
+	InstallFiles []string `json:"installFiles,omitempty" yaml:"installFiles,omitempty"`
+
+	// ResourcesDir is the directory containing custom resource files (for OLM components).
+	// Paths are relative to the data directory. Files are auto-discovered from this directory.
+	ResourcesDir string `json:"resourcesDir,omitempty" yaml:"resourcesDir,omitempty"`
+
 	// Kinds lists the Kubernetes kinds (custom resources) that this OLM operator manages.
 	// Example: ["ClusterPolicy"] for GPU Operator, ["NodeFeatureDiscovery"] for NFD Operator.
 	Kinds []string `json:"kinds,omitempty" yaml:"kinds,omitempty"`
@@ -256,18 +265,25 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		if ref.Namespace == "" && config.OLM.DefaultNamespace != "" {
 			ref.Namespace = config.OLM.DefaultNamespace
 		}
+		if len(ref.InstallFiles) == 0 && len(config.OLM.InstallFiles) > 0 {
+			ref.InstallFiles = config.OLM.InstallFiles
+		}
+		if ref.ResourcesDir == "" && config.OLM.ResourcesDir != "" {
+			ref.ResourcesDir = config.OLM.ResourcesDir
+		}
 		if len(ref.Kinds) == 0 && len(config.OLM.Kinds) > 0 {
 			ref.Kinds = config.OLM.Kinds
 		}
 		// Auto-discover custom resources from resources directory
 		if len(ref.CustomResources) == 0 {
 			var resourcesPath string
-			if config.OLM.ResourcesDir != "" {
-				// Use full path from registry
-				resourcesPath = config.OLM.ResourcesDir
+			if ref.ResourcesDir != "" {
+				// Use resourcesDir from ref (set from registry or overlay)
+				resourcesPath = ref.ResourcesDir
 			} else {
 				// Fallback to default relative path
 				resourcesPath = fmt.Sprintf("components/%s/resources", ref.Name)
+				ref.ResourcesDir = resourcesPath
 			}
 			ref.CustomResources = discoverCustomResources(resourcesPath)
 		}
@@ -670,6 +686,24 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 				result.ManifestFiles = append(result.ManifestFiles, f)
 			}
 		}
+	}
+
+	// InstallFiles: additive merge (base + overlay, deduplicated)
+	if len(overlay.InstallFiles) > 0 {
+		seen := make(map[string]bool)
+		for _, f := range result.InstallFiles {
+			seen[f] = true
+		}
+		for _, f := range overlay.InstallFiles {
+			if !seen[f] {
+				result.InstallFiles = append(result.InstallFiles, f)
+			}
+		}
+	}
+
+	// ResourcesDir: overlay takes precedence if set (for OLM)
+	if overlay.ResourcesDir != "" {
+		result.ResourcesDir = overlay.ResourcesDir
 	}
 
 	// Path: overlay takes precedence if set (for Kustomize)

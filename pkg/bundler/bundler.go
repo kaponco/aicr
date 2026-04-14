@@ -256,9 +256,7 @@ func (b *DefaultBundler) Make(ctx context.Context, recipeResult *recipe.RecipeRe
 			"component validation failed", validationErr)
 	}
 
-	// Copy external data files before deployer construction so the file list
-	// is available for both the deployer (checksum tracking) and post-generation
-	// attestation. This is a no-op when --data is not set.
+	// Copy external data files into bundle (before checksums so they're included)
 	dataFiles, err := b.copyDataFiles(dir)
 	if err != nil {
 		var se *errors.StructuredError
@@ -269,11 +267,13 @@ func (b *DefaultBundler) Make(ctx context.Context, recipeResult *recipe.RecipeRe
 			"failed to copy external data files", err)
 	}
 
-	// Build the deployer and run it
+	// Build deployer based on configuration
 	d, err := b.buildDeployer(ctx, recipeResult, componentValues, dataFiles)
 	if err != nil {
 		return nil, err
 	}
+
+	// Run deployer and build output
 	return b.runDeployer(ctx, d, recipeResult, dir, dataFiles, start)
 }
 
@@ -329,14 +329,31 @@ func (b *DefaultBundler) buildDeployer(ctx context.Context, recipeResult *recipe
 			return nil, errors.Wrap(errors.ErrCodeInternal,
 				"failed to collect component manifests", manifestErr)
 		}
+
+		// Collect OLM custom resources
+		componentCustomResources, crErr := b.collectComponentCustomResources(ctx, recipeResult)
+		if crErr != nil {
+			return nil, errors.Wrap(errors.ErrCodeInternal,
+				"failed to collect component custom resources", crErr)
+		}
+
+		// Collect OLM install files
+		componentInstallFiles, installErr := b.collectComponentInstallFiles(ctx, recipeResult)
+		if installErr != nil {
+			return nil, errors.Wrap(errors.ErrCodeInternal,
+				"failed to collect component install files", installErr)
+		}
+
 		return &helm.Generator{
-			RecipeResult:       recipeResult,
-			ComponentValues:    componentValues,
-			Version:            b.Config.Version(),
-			IncludeChecksums:   b.Config.IncludeChecksums(),
-			ComponentManifests: componentManifests,
-			DataFiles:          dataFiles,
-			DynamicValues:      dynamicValues,
+			RecipeResult:             recipeResult,
+			ComponentValues:          componentValues,
+			Version:                  b.Config.Version(),
+			IncludeChecksums:         b.Config.IncludeChecksums(),
+			ComponentManifests:       componentManifests,
+			ComponentCustomResources: componentCustomResources,
+			ComponentInstallFiles:    componentInstallFiles,
+			DataFiles:                dataFiles,
+			DynamicValues:            dynamicValues,
 		}, nil
 
 	default:
@@ -1034,6 +1051,35 @@ func (b *DefaultBundler) collectComponentCustomResources(ctx context.Context, re
 			componentCRs[crPath] = content
 		}
 		result[ref.Name] = componentCRs
+	}
+
+	return result, nil
+}
+
+// collectComponentInstallFiles gathers OLM install file contents from components,
+// keyed by component name then install file path.
+func (b *DefaultBundler) collectComponentInstallFiles(ctx context.Context, recipeResult *recipe.RecipeResult) (map[string]map[string][]byte, error) {
+	result := make(map[string]map[string][]byte)
+
+	for _, ref := range recipeResult.ComponentRefs {
+		if err := ctx.Err(); err != nil {
+			return nil, errors.Wrap(errors.ErrCodeTimeout, "context cancelled while collecting install files", err)
+		}
+
+		// Only collect install files if specified
+		if len(ref.InstallFiles) == 0 {
+			continue
+		}
+
+		componentInstallFiles := make(map[string][]byte, len(ref.InstallFiles))
+		for _, installPath := range ref.InstallFiles {
+			content, err := recipe.GetManifestContent(installPath)
+			if err != nil {
+				return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to load install file %s for component %s", installPath, ref.Name), err)
+			}
+			componentInstallFiles[installPath] = content
+		}
+		result[ref.Name] = componentInstallFiles
 	}
 
 	return result, nil

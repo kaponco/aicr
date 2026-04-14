@@ -45,6 +45,9 @@ var deployScriptTemplate string
 //go:embed templates/undeploy.sh.tmpl
 var undeployScriptTemplate string
 
+//go:embed templates/olm_install.sh.tmpl
+var olmInstallScriptTemplate string
+
 // criteriaAny is the wildcard value for criteria fields.
 const criteriaAny = "any"
 
@@ -66,11 +69,19 @@ type ComponentData struct {
 	OLMPackage      string               // OLM package name
 	OLMVersion      string               // OLM version requirement
 	CustomResources []CustomResourceData // Custom resources for OLM components
+	HasInstallFiles bool                 // True when the component has OLM install files
+	InstallFiles    []InstallFileData    // OLM install files (Subscription, OperatorGroup, etc.)
 }
 
 // CustomResourceData contains data for a custom resource file.
 type CustomResourceData struct {
 	Filename string // Base filename (e.g., "cr-node-feature-discovery.yaml")
+}
+
+// InstallFileData contains data for an OLM install file.
+type InstallFileData struct {
+	Filename string // Base filename (e.g., "install.yaml")
+	Path     string // Relative path from component dir (e.g., "olm/install.yaml")
 }
 
 // compile-time interface check
@@ -99,6 +110,10 @@ type Generator struct {
 	// ComponentCustomResources maps component name → custom resource path → content.
 	// Each component's custom resources are placed directly in its subdirectory.
 	ComponentCustomResources map[string]map[string][]byte
+
+	// ComponentInstallFiles maps component name → install file path → content.
+	// Install files (e.g., OLM Subscriptions, OperatorGroups) are placed in component's olm/ subdirectory.
+	ComponentInstallFiles map[string]map[string][]byte
 
 	// DataFiles lists additional file paths (relative to output dir) to include
 	// in checksum generation. Used for external data files copied into the bundle.
@@ -150,6 +165,17 @@ func (g *Generator) Generate(ctx context.Context, outputDir string) (*deployer.O
 	}
 	output.Files = append(output.Files, readmePath)
 	output.TotalSize += readmeSize
+
+	// Generate install.sh (for OLM components)
+	installPath, installSize, err := g.generateInstallScript(ctx, components, outputDir)
+	if err != nil {
+		return nil, errors.Wrap(errors.ErrCodeInternal,
+			"failed to generate install.sh", err)
+	}
+	if installPath != "" {
+		output.Files = append(output.Files, installPath)
+		output.TotalSize += installSize
+	}
 
 	// Generate deploy.sh
 	deployPath, deploySize, err := g.generateDeployScript(ctx, components, outputDir)
@@ -250,6 +276,25 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 			}
 		}
 
+		// Collect install files
+		hasInstallFiles := false
+		var installFiles []InstallFileData
+		if g.ComponentInstallFiles != nil {
+			if instFiles, ok := g.ComponentInstallFiles[ref.Name]; ok && len(instFiles) > 0 {
+				hasInstallFiles = true
+				for installPath := range instFiles {
+					installFiles = append(installFiles, InstallFileData{
+						Filename: filepath.Base(installPath),
+						Path:     filepath.Join("olm", filepath.Base(installPath)),
+					})
+				}
+				// Sort for deterministic output
+				sort.Slice(installFiles, func(i, j int) bool {
+					return installFiles[i].Filename < installFiles[j].Filename
+				})
+			}
+		}
+
 		components = append(components, ComponentData{
 			Name:            ref.Name,
 			Namespace:       ref.Namespace,
@@ -267,6 +312,8 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 			OLMPackage:      ref.Package,
 			OLMVersion:      ref.Version,
 			CustomResources: customResources,
+			HasInstallFiles: hasInstallFiles,
+			InstallFiles:    installFiles,
 		})
 	}
 
@@ -394,13 +441,25 @@ func (g *Generator) generateComponentDirectories(ctx context.Context, components
 		}
 
 		// Write custom resources for OLM components
-		if comp.IsOLM && input.ComponentCustomResources != nil {
-			crFiles, crSize, err := g.writeCustomResources(comp.Name, componentDir, input.ComponentCustomResources)
+		if comp.IsOLM && g.ComponentCustomResources != nil {
+			crFiles, crSize, err := g.writeCustomResources(comp.Name, componentDir, g.ComponentCustomResources)
 			if err != nil {
 				return nil, 0, err
 			}
 			files = append(files, crFiles...)
 			totalSize += crSize
+		}
+
+		// Write OLM install files if present
+		if g.ComponentInstallFiles != nil {
+			if installFiles, ok := g.ComponentInstallFiles[comp.Name]; ok && len(installFiles) > 0 {
+				installFilesWritten, installSize, err := g.writeInstallFiles(comp.Name, componentDir, installFiles)
+				if err != nil {
+					return nil, 0, err
+				}
+				files = append(files, installFilesWritten...)
+				totalSize += installSize
+			}
 		}
 	}
 
@@ -432,7 +491,7 @@ func (g *Generator) writeCustomResources(componentName, componentDir string, com
 	content := customResources[mostSpecificPath]
 
 	// Always write as "resources.yaml" for consistency
-	outputPath, pathErr := shared.SafeJoin(componentDir, "resources.yaml")
+	outputPath, pathErr := deployer.SafeJoin(componentDir, "resources.yaml")
 	if pathErr != nil {
 		return nil, 0, errors.New(errors.ErrCodeInvalidRequest,
 			fmt.Sprintf("invalid custom resource path for component %s", componentName))
@@ -446,6 +505,56 @@ func (g *Generator) writeCustomResources(componentName, componentDir string, com
 	slog.Debug("wrote merged custom resource", "component", componentName, "source", filepath.Base(mostSpecificPath), "output", "resources.yaml")
 
 	return []string{outputPath}, int64(len(content)), nil
+}
+
+// writeInstallFiles writes OLM install files to the component's olm/ subdirectory.
+// Returns paths of written files, total size, and any error.
+func (g *Generator) writeInstallFiles(componentName, componentDir string, installFiles map[string][]byte) ([]string, int64, error) {
+	if len(installFiles) == 0 {
+		return nil, 0, nil
+	}
+
+	// Create olm/ subdirectory
+	olmDir, err := deployer.SafeJoin(componentDir, "olm")
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := os.MkdirAll(olmDir, 0755); err != nil {
+		return nil, 0, errors.Wrap(errors.ErrCodeInternal,
+			fmt.Sprintf("failed to create olm directory for %s", componentName), err)
+	}
+
+	// Sort install file paths for deterministic output
+	installPaths := make([]string, 0, len(installFiles))
+	for p := range installFiles {
+		installPaths = append(installPaths, p)
+	}
+	sort.Strings(installPaths)
+
+	var files []string
+	var totalSize int64
+
+	for _, installPath := range installPaths {
+		content := installFiles[installPath]
+		filename := filepath.Base(installPath)
+		outputPath, pathErr := deployer.SafeJoin(olmDir, filename)
+		if pathErr != nil {
+			return nil, 0, errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("invalid install filename %q in component %s", filename, componentName))
+		}
+
+		if err := os.WriteFile(outputPath, content, 0600); err != nil {
+			return nil, 0, errors.WrapWithContext(errors.ErrCodeInternal, "failed to write install file", err,
+				map[string]any{"component": componentName, "filename": filename})
+		}
+
+		files = append(files, outputPath)
+		totalSize += int64(len(content))
+
+		slog.Debug("wrote install file", "component", componentName, "filename", filename)
+	}
+
+	return files, totalSize, nil
 }
 
 // generateRootREADME creates the root README.md with deployment instructions.
@@ -537,6 +646,49 @@ func (g *Generator) generateUndeployScript(ctx context.Context, components []Com
 	}
 
 	return undeployPath, undeploySize, nil
+}
+
+// generateInstallScript creates the install.sh automation script for OLM components.
+// Only generates the script if there are components with install files.
+func (g *Generator) generateInstallScript(ctx context.Context, components []ComponentData, outputDir string) (string, int64, error) {
+	if err := ctx.Err(); err != nil {
+		return "", 0, err
+	}
+
+	// Check if any components have install files
+	hasOLMComponents := false
+	for _, comp := range components {
+		if comp.HasInstallFiles {
+			hasOLMComponents = true
+			break
+		}
+	}
+
+	// Skip if no components have install files
+	if !hasOLMComponents {
+		return "", 0, nil
+	}
+
+	// Template only needs BundlerVersion - the script auto-discovers components
+	data := struct {
+		BundlerVersion string
+	}{
+		BundlerVersion: g.Version,
+	}
+
+	installPath, installSize, err := deployer.GenerateFromTemplate(olmInstallScriptTemplate, data, outputDir, "olm_install.sh")
+	if err != nil {
+		return "", 0, err
+	}
+
+	// Make executable
+	if err := os.Chmod(installPath, 0755); err != nil {
+		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set olm_install.sh permissions", err)
+	}
+
+	slog.Debug("generated olm_install.sh script")
+
+	return installPath, installSize, nil
 }
 
 // readmeTemplateData is the template data for root README.md generation.

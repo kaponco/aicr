@@ -46,7 +46,28 @@ The following constraints must be satisfied:
 {{ end }}
 
 ## Quick Start
+{{- $hasOLMComponents := false }}
+{{- range .Components }}
+{{- if .HasInstallFiles }}
+{{- $hasOLMComponents = true }}
+{{- end }}
+{{- end }}
+{{ if $hasOLMComponents }}
+### Step 1: Install OLM Operators (if applicable)
 
+If your bundle includes OLM components, install the operators first:
+
+```bash
+chmod +x olm_install.sh
+./olm_install.sh
+```
+
+This script auto-discovers components with olm/ directories and deploys OLM resources.
+
+### Step 2: Deploy All Components
+{{ else }}
+### Deploy All Components
+{{ end }}
 Run the included deployment script:
 
 ```bash
@@ -74,9 +95,20 @@ Install components individually in order:
 {{- $compNS := .Namespace }}
 ```bash
 kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl apply -f -
+{{ if .HasInstallFiles -}}
+# Install OLM resources (Subscription, OperatorGroup)
+{{- range .InstallFiles }}
+kubectl apply -f {{ $compName }}/{{ .Path }}
+{{- end }}
+# Wait for operator to be ready
+kubectl wait --for=condition=Succeeded csv -l operators.coreos.com/{{ .OLMPackage }}.{{ .Namespace }} -n {{ .Namespace }} --timeout=5m
+{{ end -}}
+{{ if ne (len .CustomResources) 0 -}}
+# Apply custom resources
 {{- range .CustomResources }}
 kubectl apply -f {{ $compName }}/{{ .Filename }} -n {{ $compNS }}
 {{- end }}
+{{ end -}}
 ```
 {{ else if .IsKustomize -}}
 ```bash

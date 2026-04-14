@@ -108,13 +108,18 @@ type OLMConfig struct {
 	// DefaultNamespace is the Kubernetes namespace for deploying this component via OLM.
 	DefaultNamespace string `yaml:"defaultNamespace,omitempty"`
 
-	// Kinds lists the Kubernetes kinds (custom resources) that this OLM operator manages.
-	// Example: ["ClusterPolicy"] for GPU Operator, ["NodeFeatureDiscovery"] for NFD Operator.
-	Kinds []string `yaml:"kinds,omitempty"`
+	// InstallFiles lists the paths to OLM installation manifest files (relative to data directory).
+	// These files typically contain OperatorGroup, Subscription, and other OLM resources.
+	// Example: ["recipes/components/nfd-operator/olm/install.yaml"]
+	InstallFiles []string `yaml:"installFiles,omitempty"`
 
 	// ResourcesDir is the directory containing custom resource files (relative to component directory).
 	// Defaults to "resources" if not specified. Files are auto-discovered from this directory.
 	ResourcesDir string `yaml:"resourcesDir,omitempty"`
+
+	// Kinds lists the Kubernetes kinds (custom resources) that this OLM operator manages.
+	// Example: ["ClusterPolicy"] for GPU Operator, ["NodeFeatureDiscovery"] for NFD Operator.
+	Kinds []string `yaml:"kinds,omitempty"`
 }
 
 // NodeSchedulingConfig defines paths for node scheduling injection.

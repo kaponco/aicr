@@ -862,3 +862,138 @@ components:
 		t.Errorf("GetType() = %v, want %v", comp.GetType(), ComponentTypeKustomize)
 	}
 }
+
+func TestOLMConfig_Parsing(t *testing.T) {
+	// Test that OLMConfig can be parsed correctly from YAML including installFiles field
+	yamlData := `
+apiVersion: aicr.nvidia.com/v1alpha1
+kind: ComponentRegistry
+components:
+  - name: test-operator
+    displayName: Test Operator
+    valueOverrideKeys:
+      - testoperator
+    olm:
+      defaultNamespace: test-namespace
+      installFiles:
+        - recipes/components/test-operator/olm/install.yaml
+        - recipes/components/test-operator/olm/subscription.yaml
+      resourcesDir: recipes/components/test-operator/resources
+      kinds:
+        - TestResource
+        - TestConfig
+`
+
+	var registry ComponentRegistry
+	err := yaml.Unmarshal([]byte(yamlData), &registry)
+	if err != nil {
+		t.Fatalf("failed to unmarshal YAML: %v", err)
+	}
+
+	if len(registry.Components) != 1 {
+		t.Fatalf("expected 1 component, got %d", len(registry.Components))
+	}
+
+	comp := registry.Components[0]
+	if comp.Name != "test-operator" {
+		t.Errorf("Name = %q, want %q", comp.Name, "test-operator")
+	}
+
+	// Verify OLM config fields are parsed correctly
+	if comp.OLM.DefaultNamespace != "test-namespace" {
+		t.Errorf("OLM.DefaultNamespace = %q, want %q", comp.OLM.DefaultNamespace, "test-namespace")
+	}
+
+	expectedInstallFiles := []string{
+		"recipes/components/test-operator/olm/install.yaml",
+		"recipes/components/test-operator/olm/subscription.yaml",
+	}
+	if len(comp.OLM.InstallFiles) != len(expectedInstallFiles) {
+		t.Errorf("OLM.InstallFiles length = %d, want %d", len(comp.OLM.InstallFiles), len(expectedInstallFiles))
+	}
+	for i, expected := range expectedInstallFiles {
+		if i >= len(comp.OLM.InstallFiles) {
+			t.Errorf("OLM.InstallFiles[%d] missing, want %q", i, expected)
+			continue
+		}
+		if comp.OLM.InstallFiles[i] != expected {
+			t.Errorf("OLM.InstallFiles[%d] = %q, want %q", i, comp.OLM.InstallFiles[i], expected)
+		}
+	}
+
+	if comp.OLM.ResourcesDir != "recipes/components/test-operator/resources" {
+		t.Errorf("OLM.ResourcesDir = %q, want %q", comp.OLM.ResourcesDir, "recipes/components/test-operator/resources")
+	}
+
+	expectedKinds := []string{"TestResource", "TestConfig"}
+	if len(comp.OLM.Kinds) != len(expectedKinds) {
+		t.Errorf("OLM.Kinds length = %d, want %d", len(comp.OLM.Kinds), len(expectedKinds))
+	}
+	for i, expected := range expectedKinds {
+		if i >= len(comp.OLM.Kinds) {
+			t.Errorf("OLM.Kinds[%d] missing, want %q", i, expected)
+			continue
+		}
+		if comp.OLM.Kinds[i] != expected {
+			t.Errorf("OLM.Kinds[%d] = %q, want %q", i, comp.OLM.Kinds[i], expected)
+		}
+	}
+
+	// Verify GetType returns OLM
+	if comp.GetType() != ComponentTypeOLM {
+		t.Errorf("GetType() = %v, want %v", comp.GetType(), ComponentTypeOLM)
+	}
+}
+
+func TestOLMConfig_RealRegistry(t *testing.T) {
+	// Test that actual registry.yaml OLM components are parsed correctly
+	registry, err := GetComponentRegistry()
+	if err != nil {
+		t.Fatalf("failed to load component registry: %v", err)
+	}
+
+	// Test nfd-operator has installFiles configured
+	nfdOp := registry.Get("nfd-operator")
+	if nfdOp == nil {
+		t.Fatal("nfd-operator not found in registry")
+	}
+
+	if nfdOp.GetType() != ComponentTypeOLM {
+		t.Errorf("nfd-operator type = %v, want %v", nfdOp.GetType(), ComponentTypeOLM)
+	}
+
+	if nfdOp.OLM.DefaultNamespace != "openshift-nfd" {
+		t.Errorf("nfd-operator OLM.DefaultNamespace = %q, want %q", nfdOp.OLM.DefaultNamespace, "openshift-nfd")
+	}
+
+	if len(nfdOp.OLM.InstallFiles) == 0 {
+		t.Error("nfd-operator should have installFiles configured")
+	}
+
+	if len(nfdOp.OLM.Kinds) == 0 {
+		t.Error("nfd-operator should have kinds configured")
+	}
+
+	if !slices.Contains(nfdOp.OLM.Kinds, "NodeFeatureDiscovery") {
+		t.Error("nfd-operator should have 'NodeFeatureDiscovery' in kinds")
+	}
+
+	// Test gpu-operator has OLM config with kinds
+	gpuOp := registry.Get("gpu-operator")
+	if gpuOp == nil {
+		t.Fatal("gpu-operator not found in registry")
+	}
+
+	// gpu-operator has both Helm and OLM config, but OLM takes precedence
+	if gpuOp.GetType() != ComponentTypeOLM {
+		t.Errorf("gpu-operator type = %v, want %v", gpuOp.GetType(), ComponentTypeOLM)
+	}
+
+	if len(gpuOp.OLM.Kinds) == 0 {
+		t.Error("gpu-operator should have kinds configured")
+	}
+
+	if !slices.Contains(gpuOp.OLM.Kinds, "ClusterPolicy") {
+		t.Error("gpu-operator should have 'ClusterPolicy' in kinds")
+	}
+}

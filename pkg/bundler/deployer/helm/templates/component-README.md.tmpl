@@ -9,6 +9,40 @@ OLM (Operator Lifecycle Manager)
 {{ if .OLMVersion -}}Version: {{ .OLMVersion }}{{ end }}
 Namespace: {{ .Namespace }}
 
+{{ if .HasInstallFiles -}}
+**Prerequisites:** This component requires an OLM-enabled cluster (OpenShift or Kubernetes with OLM installed).
+
+## Step 1: Deploy OLM Resources
+
+```bash
+# Create namespace
+kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl apply -f -
+
+# Apply OLM installation manifests (Subscription, OperatorGroup, etc.)
+{{ range .InstallFiles -}}
+kubectl apply -f {{ .Path }}
+{{ end -}}
+```
+
+## Step 2: Wait for Operator Ready
+
+```bash
+# Wait for operator ClusterServiceVersion to reach Succeeded phase
+kubectl wait --for=condition=Succeeded csv \
+  -l operators.coreos.com/{{ .OLMPackage }}.{{ .Namespace }} \
+  -n {{ .Namespace }} \
+  --timeout=5m
+```
+
+{{ if ne (len .CustomResources) 0 -}}
+## Step 3: Deploy Custom Resources
+
+```bash
+# Apply custom resources
+kubectl apply -f resources.yaml -n {{ .Namespace }}
+```
+{{ end -}}
+{{ else -}}
 **Prerequisites:** This component requires an OLM operator to be pre-installed in the cluster.
 
 ## Deploy
@@ -20,19 +54,40 @@ kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl app
 # Apply custom resources
 kubectl apply -f resources.yaml -n {{ .Namespace }}
 ```
+{{ end -}}
 
 ## Verify
 
 ```bash
+{{ if .HasInstallFiles -}}
+# Check operator installation
+kubectl get csv -n {{ .Namespace }}
+{{ if ne (len .CustomResources) 0 -}}
 # Check custom resources
 kubectl get -f resources.yaml -n {{ .Namespace }}
+{{ end -}}
+{{ else -}}
+# Check custom resources
+kubectl get -f resources.yaml -n {{ .Namespace }}
+{{ end -}}
 ```
 
 ## Undeploy
 
 ```bash
+{{ if .HasInstallFiles -}}
+{{ if ne (len .CustomResources) 0 -}}
+# Delete custom resources first
+kubectl delete -f resources.yaml -n {{ .Namespace }} --ignore-not-found
+{{ end -}}
+# Delete OLM resources
+{{ range .InstallFiles -}}
+kubectl delete -f {{ .Path }} --ignore-not-found
+{{ end -}}
+{{ else -}}
 # Delete custom resources
 kubectl delete -f resources.yaml -n {{ .Namespace }} --ignore-not-found
+{{ end -}}
 ```
 {{ else if .IsKustomize -}}
 Source: {{ .Repository }}

@@ -2350,7 +2350,7 @@ func TestGenerate_DoesNotMutateComponentValues(t *testing.T) {
 }
 
 func TestWriteCustomResources(t *testing.T) {
-	g := NewGenerator()
+	g := &Generator{}
 
 	tests := []struct {
 		name                     string
@@ -2451,18 +2451,17 @@ func TestWriteCustomResources(t *testing.T) {
 }
 
 func TestGenerate_OLMComponents(t *testing.T) {
-	g := NewGenerator()
 	ctx := context.Background()
 	outputDir := t.TempDir()
 
-	input := &GeneratorInput{
+	g := &Generator{
 		RecipeResult: &recipe.RecipeResult{
 			Kind:       "RecipeResult",
 			APIVersion: "aicr.nvidia.com/v1alpha1",
 			Metadata: struct {
 				Version            string                     `json:"version,omitempty" yaml:"version,omitempty"`
 				AppliedOverlays    []string                   `json:"appliedOverlays,omitempty" yaml:"appliedOverlays,omitempty"`
-				ExcludedOverlays   []string                   `json:"excludedOverlays,omitempty" yaml:"excludedOverlays,omitempty"`
+				ExcludedOverlays   []recipe.ExcludedOverlay   `json:"excludedOverlays,omitempty" yaml:"excludedOverlays,omitempty"`
 				ConstraintWarnings []recipe.ConstraintWarning `json:"constraintWarnings,omitempty" yaml:"constraintWarnings,omitempty"`
 			}{
 				Version: "v0.11.1",
@@ -2508,7 +2507,7 @@ func TestGenerate_OLMComponents(t *testing.T) {
 		IncludeChecksums: true,
 	}
 
-	output, err := g.Generate(ctx, input, outputDir)
+	output, err := g.Generate(ctx, outputDir)
 	if err != nil {
 		t.Fatalf("Generate() error = %v", err)
 	}
