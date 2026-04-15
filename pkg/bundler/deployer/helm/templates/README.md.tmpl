@@ -23,7 +23,7 @@ The following components are included (deployed in order):
 |-----------|------|---------|-----------|--------|
 {{ range .Components -}}
 {{ if .IsOLM -}}
-| {{ .Name }} | OLM | {{ .OLMVersion }} | {{ .Namespace }} | {{ if .OLMPackage }}{{ .OLMPackage }}{{ else }}OLM Operator{{ end }} |
+| {{ .Name }} | OLM | - | {{ .Namespace }} | OLM Operator |
 {{ else if .IsKustomize -}}
 | {{ .Name }} | Kustomize | {{ .Tag }} | {{ .Namespace }} | {{ .Repository }} ({{ .Path }}) |
 {{ else if .HasChart -}}
@@ -64,7 +64,22 @@ chmod +x olm_install.sh
 
 This script auto-discovers components with olm/ directories and deploys OLM resources.
 
-### Step 2: Deploy All Components
+### Step 2: Validate CRDs are Ready
+
+After installing OLM operators, validate that the CRDs are established:
+
+```bash
+# Create a snapshot of the current cluster state
+aicr snapshot --output snapshot.yaml
+
+# Validate CRDs without running checks (test mode)
+aicr validate --recipe recipe.yaml --snapshot snapshot.yaml --no-cluster
+```
+
+The `--no-cluster` flag runs validation in test mode, verifying CRDs and constraints
+without deploying validation jobs to the cluster.
+
+### Step 3: Deploy All Components
 {{ else }}
 ### Deploy All Components
 {{ end }}
@@ -101,13 +116,11 @@ kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl app
 kubectl apply -f {{ $compName }}/{{ .Path }}
 {{- end }}
 # Wait for operator to be ready
-kubectl wait --for=condition=Succeeded csv -l operators.coreos.com/{{ .OLMPackage }}.{{ .Namespace }} -n {{ .Namespace }} --timeout=5m
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded csv -n {{ .Namespace }} --all --timeout=5m
 {{ end -}}
 {{ if ne (len .CustomResources) 0 -}}
 # Apply custom resources
-{{- range .CustomResources }}
-kubectl apply -f {{ $compName }}/{{ .Filename }} -n {{ $compNS }}
-{{- end }}
+kubectl apply -f {{ $compName }}/resources.yaml -n {{ $compNS }}
 {{ end -}}
 ```
 {{ else if .IsKustomize -}}
@@ -177,9 +190,7 @@ To remove components (reverse order):
 {{- $compName := .Name }}
 {{- $compNS := .Namespace }}
 ```bash
-{{- range .CustomResources }}
-kubectl delete -f {{ $compName }}/{{ .Filename }} -n {{ $compNS }} --ignore-not-found
-{{- end }}
+kubectl delete -f {{ $compName }}/resources.yaml -n {{ $compNS }} --ignore-not-found
 ```
 {{ else if .IsKustomize -}}
 ```bash

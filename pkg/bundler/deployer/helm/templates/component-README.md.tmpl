@@ -1,13 +1,9 @@
 # {{ .Name }}
 
 {{ if .IsOLM -}}
-## Deployment Type
-OLM (Operator Lifecycle Manager)
-
-{{ if .OLMPackage -}}Package: {{ .OLMPackage }}
-{{ end -}}
-{{ if .OLMVersion -}}Version: {{ .OLMVersion }}{{ end }}
 Namespace: {{ .Namespace }}
+
+**Type:** OLM (Operator Lifecycle Manager)
 
 {{ if .HasInstallFiles -}}
 **Prerequisites:** This component requires an OLM-enabled cluster (OpenShift or Kubernetes with OLM installed).
@@ -27,25 +23,24 @@ kubectl apply -f {{ .Path }}
 ## Step 2: Wait for Operator Ready
 
 ```bash
-# Wait for operator ClusterServiceVersion to reach Succeeded phase
-kubectl wait --for=condition=Succeeded csv \
-  -l operators.coreos.com/{{ .OLMPackage }}.{{ .Namespace }} \
+# Wait for operator to be ready
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded csv \
   -n {{ .Namespace }} \
+  --all \
   --timeout=5m
 ```
 
-{{ if ne (len .CustomResources) 0 -}}
 ## Step 3: Deploy Custom Resources
 
 ```bash
 # Apply custom resources
 kubectl apply -f resources.yaml -n {{ .Namespace }}
 ```
-{{ end -}}
 {{ else -}}
-**Prerequisites:** This component requires an OLM operator to be pre-installed in the cluster.
+{{ if ne (len .CustomResources) 0 -}}
+**Prerequisites:** This component's operator must be pre-installed in the cluster.
 
-## Deploy
+## Deploy Custom Resources
 
 ```bash
 # Create namespace
@@ -55,6 +50,7 @@ kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl app
 kubectl apply -f resources.yaml -n {{ .Namespace }}
 ```
 {{ end -}}
+{{ end -}}
 
 ## Verify
 
@@ -62,11 +58,9 @@ kubectl apply -f resources.yaml -n {{ .Namespace }}
 {{ if .HasInstallFiles -}}
 # Check operator installation
 kubectl get csv -n {{ .Namespace }}
-{{ if ne (len .CustomResources) 0 -}}
-# Check custom resources
-kubectl get -f resources.yaml -n {{ .Namespace }}
+
 {{ end -}}
-{{ else -}}
+{{ if ne (len .CustomResources) 0 -}}
 # Check custom resources
 kubectl get -f resources.yaml -n {{ .Namespace }}
 {{ end -}}
@@ -75,18 +69,16 @@ kubectl get -f resources.yaml -n {{ .Namespace }}
 ## Undeploy
 
 ```bash
-{{ if .HasInstallFiles -}}
 {{ if ne (len .CustomResources) 0 -}}
 # Delete custom resources first
 kubectl delete -f resources.yaml -n {{ .Namespace }} --ignore-not-found
+
 {{ end -}}
+{{ if .HasInstallFiles -}}
 # Delete OLM resources
 {{ range .InstallFiles -}}
 kubectl delete -f {{ .Path }} --ignore-not-found
 {{ end -}}
-{{ else -}}
-# Delete custom resources
-kubectl delete -f resources.yaml -n {{ .Namespace }} --ignore-not-found
 {{ end -}}
 ```
 {{ else if .IsKustomize -}}

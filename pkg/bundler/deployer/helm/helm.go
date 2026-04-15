@@ -48,6 +48,9 @@ var undeployScriptTemplate string
 //go:embed templates/olm_install.sh.tmpl
 var olmInstallScriptTemplate string
 
+//go:embed templates/olm_uninstall.sh.tmpl
+var olmUninstallScriptTemplate string
+
 // criteriaAny is the wildcard value for criteria fields.
 const criteriaAny = "any"
 
@@ -66,8 +69,6 @@ type ComponentData struct {
 	Tag             string               // Git ref for Kustomize components (tag, branch, or commit)
 	Path            string               // Path within the repository to the kustomization
 	IsOLM           bool                 // True when the component uses OLM (Operator Lifecycle Manager)
-	OLMPackage      string               // OLM package name
-	OLMVersion      string               // OLM version requirement
 	CustomResources []CustomResourceData // Custom resources for OLM components
 	HasInstallFiles bool                 // True when the component has OLM install files
 	InstallFiles    []InstallFileData    // OLM install files (Subscription, OperatorGroup, etc.)
@@ -170,11 +171,22 @@ func (g *Generator) Generate(ctx context.Context, outputDir string) (*deployer.O
 	installPath, installSize, err := g.generateInstallScript(ctx, components, outputDir)
 	if err != nil {
 		return nil, errors.Wrap(errors.ErrCodeInternal,
-			"failed to generate install.sh", err)
+			"failed to generate olm_install.sh", err)
 	}
 	if installPath != "" {
 		output.Files = append(output.Files, installPath)
 		output.TotalSize += installSize
+	}
+
+	// Generate olm_uninstall.sh (for OLM components)
+	uninstallPath, uninstallSize, err := g.generateOLMUninstallScript(ctx, components, outputDir)
+	if err != nil {
+		return nil, errors.Wrap(errors.ErrCodeInternal,
+			"failed to generate olm_uninstall.sh", err)
+	}
+	if uninstallPath != "" {
+		output.Files = append(output.Files, uninstallPath)
+		output.TotalSize += uninstallSize
 	}
 
 	// Generate deploy.sh
@@ -309,8 +321,6 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 			Tag:             ref.Tag,
 			Path:            ref.Path,
 			IsOLM:           isOLM,
-			OLMPackage:      ref.Package,
-			OLMVersion:      ref.Version,
 			CustomResources: customResources,
 			HasInstallFiles: hasInstallFiles,
 			InstallFiles:    installFiles,
@@ -341,27 +351,29 @@ func (g *Generator) generateComponentDirectories(ctx context.Context, components
 				fmt.Sprintf("failed to create directory for %s", comp.Name), mkdirErr)
 		}
 
-		// Deep-copy component values so writeClusterValuesFile can safely
-		// remove dynamic paths without mutating the caller's map.
-		values := component.DeepCopyMap(g.ComponentValues[comp.Name])
+		if !comp.IsOLM {
+			// Deep-copy component values so writeClusterValuesFile can safely
+			// remove dynamic paths without mutating the caller's map.
+			values := component.DeepCopyMap(g.ComponentValues[comp.Name])
 
-		// Extract dynamic paths (if any) from values into cluster-values.yaml.
-		// Every component gets a cluster-values.yaml — dynamic paths are pre-populated,
-		// and users can add any additional overrides. deploy.sh always passes it.
-		clusterFiles, clusterSize, clusterErr := writeClusterValuesFile(values, g.DynamicValues[comp.Name], componentDir, comp.Name)
-		if clusterErr != nil {
-			return nil, 0, clusterErr
-		}
-		files = append(files, clusterFiles...)
-		totalSize += clusterSize
+			// Extract dynamic paths (if any) from values into cluster-values.yaml.
+			// Every component gets a cluster-values.yaml — dynamic paths are pre-populated,
+			// and users can add any additional overrides. deploy.sh always passes it.
+			clusterFiles, clusterSize, clusterErr := writeClusterValuesFile(values, g.DynamicValues[comp.Name], componentDir, comp.Name)
+			if clusterErr != nil {
+				return nil, 0, clusterErr
+			}
+			files = append(files, clusterFiles...)
+			totalSize += clusterSize
 
-		valuesPath, valuesSize, err := deployer.WriteValuesFile(values, componentDir, "values.yaml")
-		if err != nil {
-			return nil, 0, errors.Wrap(errors.ErrCodeInternal,
-				fmt.Sprintf("failed to write values.yaml for %s", comp.Name), err)
+			valuesPath, valuesSize, err := deployer.WriteValuesFile(values, componentDir, "values.yaml")
+			if err != nil {
+				return nil, 0, errors.Wrap(errors.ErrCodeInternal,
+					fmt.Sprintf("failed to write values.yaml for %s", comp.Name), err)
+			}
+			files = append(files, valuesPath)
+			totalSize += valuesSize
 		}
-		files = append(files, valuesPath)
-		totalSize += valuesSize
 
 		// Write component README.md
 		readmePath, readmeSize, err := deployer.GenerateFromTemplate(componentReadmeTemplate, comp, componentDir, "README.md")
@@ -669,9 +681,24 @@ func (g *Generator) generateInstallScript(ctx context.Context, components []Comp
 		return "", 0, nil
 	}
 
-	// Template only needs BundlerVersion - the script auto-discovers components
+	// Collect OLM components for template
+	type OLMComponent struct {
+		Name      string
+		Namespace string
+	}
+	olmComponents := []OLMComponent{}
+	for _, comp := range components {
+		if comp.HasInstallFiles {
+			olmComponents = append(olmComponents, OLMComponent{
+				Name:      comp.Name,
+				Namespace: comp.Namespace,
+			})
+		}
+	}
+
 	data := struct {
 		BundlerVersion string
+		OLMComponents  []OLMComponent
 	}{
 		BundlerVersion: g.Version,
 	}
@@ -689,6 +716,71 @@ func (g *Generator) generateInstallScript(ctx context.Context, components []Comp
 	slog.Debug("generated olm_install.sh script")
 
 	return installPath, installSize, nil
+}
+
+// generateOLMUninstallScript creates the olm_uninstall.sh automation script for OLM components.
+// Only generates the script if there are components with install files.
+func (g *Generator) generateOLMUninstallScript(ctx context.Context, components []ComponentData, outputDir string) (string, int64, error) {
+	if err := ctx.Err(); err != nil {
+		return "", 0, err
+	}
+
+	// Check if any components have install files
+	hasOLMComponents := false
+	for _, comp := range components {
+		if comp.HasInstallFiles {
+			hasOLMComponents = true
+			break
+		}
+	}
+
+	// Skip if no components have install files
+	if !hasOLMComponents {
+		return "", 0, nil
+	}
+
+	// Collect OLM components for template (reuse same structure as install script)
+	type OLMComponent struct {
+		Name      string
+		Namespace string
+	}
+	olmComponents := []OLMComponent{}
+	for _, comp := range components {
+		if comp.HasInstallFiles {
+			olmComponents = append(olmComponents, OLMComponent{
+				Name:      comp.Name,
+				Namespace: comp.Namespace,
+			})
+		}
+	}
+
+	// Reverse the order for uninstall (dependencies first)
+	olmComponentsReversed := make([]OLMComponent, len(olmComponents))
+	for i, comp := range olmComponents {
+		olmComponentsReversed[len(olmComponents)-1-i] = comp
+	}
+
+	data := struct {
+		BundlerVersion string
+		OLMComponents  []OLMComponent
+	}{
+		BundlerVersion: g.Version,
+		OLMComponents:  olmComponentsReversed,
+	}
+
+	uninstallPath, uninstallSize, err := deployer.GenerateFromTemplate(olmUninstallScriptTemplate, data, outputDir, "olm_uninstall.sh")
+	if err != nil {
+		return "", 0, err
+	}
+
+	// Make executable
+	if err := os.Chmod(uninstallPath, 0755); err != nil {
+		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set olm_uninstall.sh permissions", err)
+	}
+
+	slog.Debug("generated olm_uninstall.sh script")
+
+	return uninstallPath, uninstallSize, nil
 }
 
 // readmeTemplateData is the template data for root README.md generation.
