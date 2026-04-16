@@ -45,7 +45,7 @@ spec:
     enabled: true
     installDir: /usr/local/nvidia
   gdrcopy:
-    enabled: true
+    enabled: false
   sandboxWorkloads:
     enabled: false
   nodeStatusExporter:

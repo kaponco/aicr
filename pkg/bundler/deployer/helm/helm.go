@@ -465,7 +465,7 @@ func (g *Generator) generateComponentDirectories(ctx context.Context, components
 		// Write OLM install files if present
 		if g.ComponentInstallFiles != nil {
 			if installFiles, ok := g.ComponentInstallFiles[comp.Name]; ok && len(installFiles) > 0 {
-				installFilesWritten, installSize, err := g.writeInstallFiles(comp.Name, componentDir, installFiles)
+				installFilesWritten, installSize, err := g.writeInstallFiles(comp.Name, comp.Namespace, componentDir, installFiles)
 				if err != nil {
 					return nil, 0, err
 				}
@@ -520,8 +520,9 @@ func (g *Generator) writeCustomResources(componentName, componentDir string, com
 }
 
 // writeInstallFiles writes OLM install files to the component's olm/ subdirectory.
+// Substitutes {{NAMESPACE}} placeholder with the actual component namespace.
 // Returns paths of written files, total size, and any error.
-func (g *Generator) writeInstallFiles(componentName, componentDir string, installFiles map[string][]byte) ([]string, int64, error) {
+func (g *Generator) writeInstallFiles(componentName, namespace, componentDir string, installFiles map[string][]byte) ([]string, int64, error) {
 	if len(installFiles) == 0 {
 		return nil, 0, nil
 	}
@@ -548,6 +549,7 @@ func (g *Generator) writeInstallFiles(componentName, componentDir string, instal
 
 	for _, installPath := range installPaths {
 		content := installFiles[installPath]
+
 		filename := filepath.Base(installPath)
 		outputPath, pathErr := deployer.SafeJoin(olmDir, filename)
 		if pathErr != nil {
@@ -563,7 +565,7 @@ func (g *Generator) writeInstallFiles(componentName, componentDir string, instal
 		files = append(files, outputPath)
 		totalSize += int64(len(content))
 
-		slog.Debug("wrote install file", "component", componentName, "filename", filename)
+		slog.Debug("wrote install file", "component", componentName, "filename", filename, "namespace", namespace)
 	}
 
 	return files, totalSize, nil
@@ -815,14 +817,14 @@ func reverseComponents(components []ComponentData) []ComponentData {
 	return reversed
 }
 
-// uniqueNamespaces returns deduplicated namespaces from Helm/Kustomize/OLM components,
-// preserving order. Manifest-only components are excluded to match the previous
-// behavior where namespace cleanup only occurred inside HasChart/IsKustomize branches.
+// uniqueNamespaces returns deduplicated namespaces from Helm/Kustomize components,
+// preserving order. Manifest-only components and OLM components are excluded.
+// OLM namespaces are managed by olm_uninstall.sh instead.
 func uniqueNamespaces(components []ComponentData) []string {
 	seen := make(map[string]bool)
 	var namespaces []string
 	for _, c := range components {
-		if c.Namespace != "" && !seen[c.Namespace] && (c.HasChart || c.IsKustomize || c.IsOLM) {
+		if c.Namespace != "" && !seen[c.Namespace] && (c.HasChart || c.IsKustomize) {
 			seen[c.Namespace] = true
 			namespaces = append(namespaces, c.Namespace)
 		}

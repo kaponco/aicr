@@ -15,7 +15,6 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: gpu-operator-certified
-  namespace: gpu-operator
 spec:
   channel: "v25.10"
   installPlanApproval: Automatic
@@ -28,7 +27,8 @@ apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: nvidia-gpu-operator-group
-  namespace: gpu-operator
 spec:
+  # NOTE: targetNamespaces must match the namespace this is deployed to.
+  # This is the standard NVIDIA GPU Operator namespace. Edit if using a custom namespace.
   targetNamespaces:
-  - gpu-operator
+  - nvidia-gpu-operator

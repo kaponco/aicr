@@ -6,28 +6,12 @@ set -euo pipefail
 #
 # This script uninstalls OLM (Operator Lifecycle Manager) operators by:
 #   1. Deleting the Subscription and OperatorGroup manifests
-#   2. Optionally deleting the operator namespace
+#   2. Deleting the ClusterServiceVersion (CSV)
+#   3. Deleting the operator namespace
 #
-# Usage: ./olm_uninstall.sh [--delete-namespaces]
-#   --delete-namespaces  Also delete operator namespaces (default: keep namespaces)
+# Usage: ./olm_uninstall.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DELETE_NAMESPACES=false
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --delete-namespaces)
-      DELETE_NAMESPACES=true
-      shift
-      ;;
-    *)
-      echo "Unknown option: $1"
-      echo "Usage: $0 [--delete-namespaces]"
-      exit 1
-      ;;
-  esac
-done
 
 echo "==> Uninstalling OLM Components"
 echo ""
@@ -41,10 +25,13 @@ echo "==> Uninstalling {{ .Name }}"
 echo "    Deleting {{ .Name }}/olm/install.yaml"
 kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/olm/install.yaml" --ignore-not-found
 
-if [[ "${DELETE_NAMESPACES}" == "true" ]]; then
-  echo "    Deleting namespace {{ .Namespace }}"
-  kubectl delete namespace {{ .Namespace }} --ignore-not-found
-fi
+# Delete CSV (ClusterServiceVersion)
+echo "    Deleting CSV in namespace {{ .Namespace }}"
+kubectl delete csv --all -n {{ .Namespace }} --ignore-not-found
+
+# Delete namespace
+echo "    Deleting namespace {{ .Namespace }}"
+kubectl delete namespace {{ .Namespace }} --ignore-not-found
 
 echo "    ✓ {{ .Name }} uninstalled"
 echo ""
@@ -53,5 +40,4 @@ echo ""
 echo "==> OLM Operators Uninstallation Complete"
 echo ""
 echo "Note:"
-echo "  - Namespaces were preserved (use --delete-namespaces to remove them)"
 echo "  - Custom resources must be deleted separately via ./undeploy.sh or manually"
