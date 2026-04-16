@@ -153,9 +153,9 @@ func TestDeployer_EnsureRBAC(t *testing.T) {
 			t.Fatalf("ClusterRole not found: %v", err)
 		}
 
-		// Default: 3 rules (nodes, pods, clusterpolicies)
-		if len(cr.Rules) != 3 {
-			t.Errorf("expected 3 rules, got %d", len(cr.Rules))
+		// Default: 4 rules (nodes, pods, clusterpolicies, customresourcedefinitions)
+		if len(cr.Rules) != 4 {
+			t.Errorf("expected 4 rules, got %d", len(cr.Rules))
 		}
 	})
 

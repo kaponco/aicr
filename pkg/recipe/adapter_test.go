@@ -16,12 +16,30 @@ package recipe
 
 import (
 	"context"
+	"io/fs"
 	"strings"
 	"testing"
 	"testing/fstest"
 )
 
 const testVersionV2 = "v2.0"
+
+// testFSProvider is a test implementation of DataProvider using fstest.MapFS
+type testFSProvider struct {
+	fs fstest.MapFS
+}
+
+func (p *testFSProvider) ReadFile(path string) ([]byte, error) {
+	return fs.ReadFile(p.fs, path)
+}
+
+func (p *testFSProvider) WalkDir(root string, fn fs.WalkDirFunc) error {
+	return fs.WalkDir(p.fs, root, fn)
+}
+
+func (p *testFSProvider) Source(path string) string {
+	return "test-fs:" + path
+}
 
 func TestMergeValues(t *testing.T) {
 	tests := []struct {

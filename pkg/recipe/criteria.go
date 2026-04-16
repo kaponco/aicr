@@ -73,7 +73,7 @@ func ParseCriteriaServiceType(s string) (CriteriaServiceType, error) {
 
 // GetCriteriaServiceTypes returns all supported service types sorted alphabetically.
 func GetCriteriaServiceTypes() []string {
-	return []string{"aks", "eks", "gke", "kind", "ocp", "lke", "oke"}
+	return []string{"aks", "eks", "gke", "kind", "lke", "oke", "ocp"}
 }
 
 // CriteriaAcceleratorType represents the GPU/accelerator type.

@@ -37,6 +37,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 func TestRecipeMetadataSpecValidateDependencies(t *testing.T) {
