@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"maps"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -116,9 +118,9 @@ type ComponentRef struct {
 	// Paths are relative to the data directory.
 	InstallFiles []string `json:"installFiles,omitempty" yaml:"installFiles,omitempty"`
 
-	// ResourcesDir is the directory containing custom resource files (for OLM components).
-	// Paths are relative to the data directory. Files are auto-discovered from this directory.
-	ResourcesDir string `json:"resourcesDir,omitempty" yaml:"resourcesDir,omitempty"`
+	// ResourcesFile is the path to the custom resource file (for OLM components).
+	// Path is relative to the data directory (e.g., "components/gpu-operator/resources/resources.yaml").
+	ResourcesFile string `json:"resourcesFile,omitempty" yaml:"resourcesFile,omitempty"`
 
 	// Kinds lists the Kubernetes kinds (custom resources) that this OLM operator manages.
 	// Example: ["ClusterPolicy"] for GPU Operator, ["NodeFeatureDiscovery"] for NFD Operator.
@@ -268,24 +270,37 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		if len(ref.InstallFiles) == 0 && len(config.OLM.InstallFiles) > 0 {
 			ref.InstallFiles = config.OLM.InstallFiles
 		}
-		if ref.ResourcesDir == "" && config.OLM.ResourcesDir != "" {
-			ref.ResourcesDir = config.OLM.ResourcesDir
-		}
 		if len(ref.Kinds) == 0 && len(config.OLM.Kinds) > 0 {
 			ref.Kinds = config.OLM.Kinds
 		}
-		// Auto-discover custom resources from resources directory
+		// Auto-discover custom resources from resources file or directory
 		if len(ref.CustomResources) == 0 {
-			var resourcesPath string
-			if ref.ResourcesDir != "" {
-				// Use resourcesDir from ref (set from registry or overlay)
-				resourcesPath = ref.ResourcesDir
+			var resourcesFile string
+			explicitlySet := ref.ResourcesFile != ""
+
+			if explicitlySet {
+				// Use resourcesFile from ref (set from overlay)
+				resourcesFile = ref.ResourcesFile
 			} else {
-				// Fallback to default relative path
-				resourcesPath = fmt.Sprintf("components/%s/resources", ref.Name)
-				ref.ResourcesDir = resourcesPath
+				// Fallback to default resources.yaml path
+				resourcesFile = fmt.Sprintf("components/%s/resources/resources.yaml", ref.Name)
+				ref.ResourcesFile = resourcesFile
 			}
-			ref.CustomResources = discoverCustomResources(resourcesPath)
+
+			if explicitlySet {
+				// When resourcesFile is explicitly set from overlay, use only that specific file
+				provider := GetDataProvider()
+				if provider != nil {
+					if _, err := provider.ReadFile(resourcesFile); err == nil {
+						ref.CustomResources = []string{resourcesFile}
+					}
+				}
+			} else {
+				// When using default path, scan directory for all resource files
+				// to support auto-discovery of variant files (e.g., resources-ocp-training.yaml)
+				resourcesDir := filepath.Dir(resourcesFile)
+				ref.CustomResources = discoverCustomResources(resourcesDir)
+			}
 		}
 		// Clear Helm/Kustomize-specific fields that don't apply to OLM components
 		ref.Source = ""
@@ -701,9 +716,9 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 		}
 	}
 
-	// ResourcesDir: overlay takes precedence if set (for OLM)
-	if overlay.ResourcesDir != "" {
-		result.ResourcesDir = overlay.ResourcesDir
+	// ResourcesFile: overlay takes precedence if set (for OLM)
+	if overlay.ResourcesFile != "" {
+		result.ResourcesFile = overlay.ResourcesFile
 	}
 
 	// Path: overlay takes precedence if set (for Kustomize)

@@ -113,10 +113,6 @@ type OLMConfig struct {
 	// Example: ["recipes/components/nfd-operator/olm/install.yaml"]
 	InstallFiles []string `yaml:"installFiles,omitempty"`
 
-	// ResourcesDir is the directory containing custom resource files (relative to component directory).
-	// Defaults to "resources" if not specified. Files are auto-discovered from this directory.
-	ResourcesDir string `yaml:"resourcesDir,omitempty"`
-
 	// Kinds lists the Kubernetes kinds (custom resources) that this OLM operator manages.
 	// Example: ["ClusterPolicy"] for GPU Operator, ["NodeFeatureDiscovery"] for NFD Operator.
 	Kinds []string `yaml:"kinds,omitempty"`

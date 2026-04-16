@@ -44,11 +44,13 @@ spec:
     # NFD must be deployed before GPU Operator as it provides hardware detection
     - name: nfd-operator
       type: OLM
+      resourcesFile: components/nfd-operator/resources/resources-ocp.yaml
 
     # GPU Operator deployed via OLM (Operator Lifecycle Manager)
     # OLM is the standard deployment method for operators on OpenShift
     - name: gpu-operator
       type: OLM
+      resourcesFile: components/gpu-operator/resources/resources-ocp.yaml
       dependencyRefs:
         - nfd-operator
 

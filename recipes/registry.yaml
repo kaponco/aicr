@@ -29,11 +29,16 @@
 #     defaultSource:     Git repository or OCI reference
 #     defaultPath:       Path within the repository to the kustomization
 #     defaultTag:        Git tag, branch, or commit
+#   olm:               Default OLM (Operator Lifecycle Manager) settings (for OLM components)
+#     defaultNamespace:  Default Kubernetes namespace for the operator
+#     installFiles:      Paths to OLM installation manifests (Subscription, OperatorGroup, etc.)
+#     kinds:             Kubernetes kinds (CRDs) this operator manages (e.g., ["ClusterPolicy"])
 #   testTier:          Optional override for component test tier detection
 #                      (scheduling, deploy, or gpu-aware). Used by tools/component-test/.
 #   nodeScheduling:    Paths in Helm values where node selectors/tolerations are injected
 #
-# Note: A component must have either 'helm' OR 'kustomize' configuration, not both.
+# Note: A component must have either 'helm', 'kustomize', OR 'olm' configuration.
+# For OLM components, resourcesDir is specified in overlays (e.g., recipes/overlays/ocp.yaml).
 # Node scheduling paths define WHERE CLI flags like --system-node-selector are applied.
 # The actual values come from CLI flags, not from this file.
 #
@@ -79,7 +84,6 @@ components:
       defaultNamespace: openshift-nfd
       installFiles:
         - components/nfd-operator/olm/install.yaml
-      resourcesDir: components/nfd-operator/resources
       kinds:
         - NodeFeatureDiscovery
     nodeScheduling:
@@ -114,7 +118,6 @@ components:
         - components/gpu-operator/olm/install.yaml
       kinds:
         - ClusterPolicy
-      resourcesDir: components/gpu-operator/resources
     nodeScheduling:
       system:
         nodeSelectorPaths:

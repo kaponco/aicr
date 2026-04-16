@@ -481,21 +481,21 @@ func TestMergeComponentRef_AdvancedFields(t *testing.T) {
 		}
 	})
 
-	t.Run("resourcesDir from overlay", func(t *testing.T) {
-		base := ComponentRef{Name: "test", ResourcesDir: "base/resources"}
-		overlay := ComponentRef{Name: "test", ResourcesDir: "overlay/resources"}
+	t.Run("resourcesFile from overlay", func(t *testing.T) {
+		base := ComponentRef{Name: "test", ResourcesFile: "base/resources/resources.yaml"}
+		overlay := ComponentRef{Name: "test", ResourcesFile: "overlay/resources/resources.yaml"}
 		result := mergeComponentRef(base, overlay)
-		if result.ResourcesDir != "overlay/resources" {
-			t.Errorf("resourcesDir = %q, want overlay/resources", result.ResourcesDir)
+		if result.ResourcesFile != "overlay/resources/resources.yaml" {
+			t.Errorf("resourcesFile = %q, want overlay/resources/resources.yaml", result.ResourcesFile)
 		}
 	})
 
-	t.Run("resourcesDir inherited from base", func(t *testing.T) {
-		base := ComponentRef{Name: "test", ResourcesDir: "base/resources"}
+	t.Run("resourcesFile inherited from base", func(t *testing.T) {
+		base := ComponentRef{Name: "test", ResourcesFile: "base/resources/resources.yaml"}
 		overlay := ComponentRef{Name: "test"}
 		result := mergeComponentRef(base, overlay)
-		if result.ResourcesDir != "base/resources" {
-			t.Errorf("resourcesDir = %q, want base/resources (inherited)", result.ResourcesDir)
+		if result.ResourcesFile != "base/resources/resources.yaml" {
+			t.Errorf("resourcesFile = %q, want base/resources/resources.yaml (inherited)", result.ResourcesFile)
 		}
 	})
 
@@ -1400,7 +1400,7 @@ func TestDiscoverCustomResources(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:    "directory with subdirectories - only files at root level",
+			name:    "directory with subdirectories - includes nested files",
 			dirPath: "components/nested/resources",
 			files: map[string]string{
 				"components/nested/resources/root.yaml":          "kind: Root",
@@ -1471,15 +1471,14 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 				OLM: OLMConfig{
 					DefaultNamespace: "nvidia-gpu-operator",
 					Kinds:            []string{"ClusterPolicy"},
-					ResourcesDir:     "resources",
 				},
 			},
 			expected: ComponentRef{
-				Name:         "gpu-operator",
-				Type:         ComponentTypeOLM,
-				Namespace:    "nvidia-gpu-operator",
-				ResourcesDir: "resources",
-				Kinds:        []string{"ClusterPolicy"},
+				Name:          "gpu-operator",
+				Type:          ComponentTypeOLM,
+				Namespace:     "nvidia-gpu-operator",
+				ResourcesFile: "components/gpu-operator/resources/resources.yaml", // Default from auto-discovery
+				Kinds:         []string{"ClusterPolicy"},
 				// These should be cleared:
 				Source:     "",
 				Version:    "",
@@ -1502,14 +1501,14 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 				},
 			},
 			expected: ComponentRef{
-				Name:         "nfd-operator",
-				Type:         ComponentTypeOLM,
-				Namespace:    "custom-nfd-namespace", // Preserved
-				ResourcesDir: "components/nfd-operator/resources",
-				Kinds:        []string{"NodeFeatureDiscovery"},
-				Source:       "",
-				Version:      "",
-				Chart:        "",
+				Name:          "nfd-operator",
+				Type:          ComponentTypeOLM,
+				Namespace:     "custom-nfd-namespace", // Preserved
+				ResourcesFile: "components/nfd-operator/resources/resources.yaml",
+				Kinds:         []string{"NodeFeatureDiscovery"},
+				Source:        "",
+				Version:       "",
+				Chart:         "",
 			},
 		},
 		{
@@ -1551,13 +1550,13 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 				},
 			},
 			expected: ComponentRef{
-				Name:         "test-operator",
-				Type:         ComponentTypeOLM,
-				ResourcesDir: "components/test-operator/resources",
-				Kinds:        []string{"CustomResourceA", "CustomResourceB"},
-				Source:       "",
-				Version:      "",
-				Chart:        "",
+				Name:          "test-operator",
+				Type:          ComponentTypeOLM,
+				ResourcesFile: "components/test-operator/resources/resources.yaml",
+				Kinds:         []string{"CustomResourceA", "CustomResourceB"},
+				Source:        "",
+				Version:       "",
+				Chart:         "",
 			},
 		},
 		{
@@ -1585,11 +1584,11 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 					"recipes/components/nfd-operator/olm/install.yaml",
 					"recipes/components/nfd-operator/olm/subscription.yaml",
 				},
-				ResourcesDir: "components/nfd-operator/resources",
-				Kinds:        []string{"NodeFeatureDiscovery"},
-				Source:       "",
-				Version:      "",
-				Chart:        "",
+				ResourcesFile: "components/nfd-operator/resources/resources.yaml",
+				Kinds:         []string{"NodeFeatureDiscovery"},
+				Source:        "",
+				Version:       "",
+				Chart:         "",
 			},
 		},
 		{
@@ -1616,58 +1615,11 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 				InstallFiles: []string{
 					"custom/install.yaml", // Preserved
 				},
-				ResourcesDir: "components/test-operator/resources",
-				Kinds:        []string{"TestResource"},
-				Source:       "",
-				Version:      "",
-				Chart:        "",
-			},
-		},
-		{
-			name: "OLM component - apply resourcesDir from config",
-			ref: &ComponentRef{
-				Name: "test-operator",
-				Type: ComponentTypeOLM,
-			},
-			config: &ComponentConfig{
-				Name: "test-operator",
-				OLM: OLMConfig{
-					ResourcesDir: "recipes/components/test-operator/resources",
-					Kinds:        []string{"TestResource"},
-				},
-			},
-			expected: ComponentRef{
-				Name:         "test-operator",
-				Type:         ComponentTypeOLM,
-				ResourcesDir: "recipes/components/test-operator/resources",
-				Kinds:        []string{"TestResource"},
-				Source:       "",
-				Version:      "",
-				Chart:        "",
-			},
-		},
-		{
-			name: "OLM component - preserve existing resourcesDir",
-			ref: &ComponentRef{
-				Name:         "test-operator",
-				Type:         ComponentTypeOLM,
-				ResourcesDir: "custom/resources",
-			},
-			config: &ComponentConfig{
-				Name: "test-operator",
-				OLM: OLMConfig{
-					ResourcesDir: "default/resources",
-					Kinds:        []string{"TestResource"},
-				},
-			},
-			expected: ComponentRef{
-				Name:         "test-operator",
-				Type:         ComponentTypeOLM,
-				ResourcesDir: "custom/resources", // Preserved
-				Kinds:        []string{"TestResource"},
-				Source:       "",
-				Version:      "",
-				Chart:        "",
+				ResourcesFile: "components/test-operator/resources/resources.yaml",
+				Kinds:         []string{"TestResource"},
+				Source:        "",
+				Version:       "",
+				Chart:         "",
 			},
 		},
 	}
@@ -1720,9 +1672,9 @@ func TestApplyComponentDefaults_OLM(t *testing.T) {
 				}
 			}
 
-			// Check ResourcesDir
-			if tt.ref.ResourcesDir != tt.expected.ResourcesDir {
-				t.Errorf("ResourcesDir = %q, want %q", tt.ref.ResourcesDir, tt.expected.ResourcesDir)
+			// Check ResourcesFile
+			if tt.ref.ResourcesFile != tt.expected.ResourcesFile {
+				t.Errorf("ResourcesFile = %q, want %q", tt.ref.ResourcesFile, tt.expected.ResourcesFile)
 			}
 		})
 	}

@@ -878,7 +878,6 @@ components:
       installFiles:
         - recipes/components/test-operator/olm/install.yaml
         - recipes/components/test-operator/olm/subscription.yaml
-      resourcesDir: recipes/components/test-operator/resources
       kinds:
         - TestResource
         - TestConfig
@@ -919,10 +918,6 @@ components:
 		if comp.OLM.InstallFiles[i] != expected {
 			t.Errorf("OLM.InstallFiles[%d] = %q, want %q", i, comp.OLM.InstallFiles[i], expected)
 		}
-	}
-
-	if comp.OLM.ResourcesDir != "recipes/components/test-operator/resources" {
-		t.Errorf("OLM.ResourcesDir = %q, want %q", comp.OLM.ResourcesDir, "recipes/components/test-operator/resources")
 	}
 
 	expectedKinds := []string{"TestResource", "TestConfig"}

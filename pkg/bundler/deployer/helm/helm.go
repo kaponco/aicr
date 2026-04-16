@@ -350,7 +350,6 @@ func (g *Generator) generateComponentDirectories(ctx context.Context, components
 			return nil, 0, errors.Wrap(errors.ErrCodeInternal,
 				fmt.Sprintf("failed to create directory for %s", comp.Name), mkdirErr)
 		}
-
 		if !comp.IsOLM {
 			// Deep-copy component values so writeClusterValuesFile can safely
 			// remove dynamic paths without mutating the caller's map.
@@ -595,9 +594,15 @@ func (g *Generator) generateRootREADME(ctx context.Context, components []Compone
 		}
 	}
 
+	var service string
+	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
+		service = string(g.RecipeResult.Criteria.Service)
+	}
+
 	data := readmeTemplateData{
 		RecipeVersion:      g.RecipeResult.Metadata.Version,
 		BundlerVersion:     g.Version,
+		Service:            service,
 		Components:         components,
 		ComponentsReversed: reverseComponents(components),
 		Criteria:           criteriaLines,
@@ -618,8 +623,14 @@ func (g *Generator) generateDeployScript(ctx context.Context, components []Compo
 		return "", 0, err
 	}
 
+	var service string
+	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
+		service = string(g.RecipeResult.Criteria.Service)
+	}
+
 	data := deployTemplateData{
 		BundlerVersion: g.Version,
+		Service:        service,
 		Components:     components,
 	}
 
@@ -642,9 +653,15 @@ func (g *Generator) generateUndeployScript(ctx context.Context, components []Com
 		return "", 0, err
 	}
 
+	var service string
+	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
+		service = string(g.RecipeResult.Criteria.Service)
+	}
+
 	reversed := reverseComponents(components)
 	data := undeployTemplateData{
 		BundlerVersion:     g.Version,
+		Service:            service,
 		ComponentsReversed: reversed,
 		Namespaces:         uniqueNamespaces(reversed),
 	}
@@ -698,11 +715,19 @@ func (g *Generator) generateInstallScript(ctx context.Context, components []Comp
 		}
 	}
 
+	var service string
+	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
+		service = string(g.RecipeResult.Criteria.Service)
+	}
+
 	data := struct {
 		BundlerVersion string
+		Service        string
 		OLMComponents  []OLMComponent
 	}{
 		BundlerVersion: g.Version,
+		Service:        service,
+		OLMComponents:  olmComponents,
 	}
 
 	installPath, installSize, err := deployer.GenerateFromTemplate(olmInstallScriptTemplate, data, outputDir, "olm_install.sh")
@@ -762,11 +787,18 @@ func (g *Generator) generateOLMUninstallScript(ctx context.Context, components [
 		olmComponentsReversed[len(olmComponents)-1-i] = comp
 	}
 
+	var service string
+	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
+		service = string(g.RecipeResult.Criteria.Service)
+	}
+
 	data := struct {
 		BundlerVersion string
+		Service        string
 		OLMComponents  []OLMComponent
 	}{
 		BundlerVersion: g.Version,
+		Service:        service,
 		OLMComponents:  olmComponentsReversed,
 	}
 
@@ -789,6 +821,7 @@ func (g *Generator) generateOLMUninstallScript(ctx context.Context, components [
 type readmeTemplateData struct {
 	RecipeVersion      string
 	BundlerVersion     string
+	Service            string // Kubernetes service type (ocp, eks, gke, etc.)
 	Components         []ComponentData
 	ComponentsReversed []ComponentData
 	Criteria           []string
@@ -798,12 +831,14 @@ type readmeTemplateData struct {
 // deployTemplateData is the template data for deploy.sh generation.
 type deployTemplateData struct {
 	BundlerVersion string
+	Service        string // Kubernetes service type (ocp, eks, gke, etc.)
 	Components     []ComponentData
 }
 
 // undeployTemplateData is the template data for undeploy.sh generation.
 type undeployTemplateData struct {
 	BundlerVersion     string
+	Service            string // Kubernetes service type (ocp, eks, gke, etc.)
 	ComponentsReversed []ComponentData
 	Namespaces         []string // unique namespaces in reverse-deployment order
 }
