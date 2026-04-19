@@ -293,10 +293,12 @@ fi
 # Check for orphaned CRDs from previous deployments.
 # Scoped to CRD groups belonging to components in this bundle to avoid
 # false positives from unrelated platform installs on shared clusters.
+# Note: OLM-managed operators install CRDs via operator lifecycle - those are expected
+# to exist and are not checked here.
 ORPHANED_CRD_GROUPS=""
 {{- range .Components }}
 {{- if eq .Name "kai-scheduler" }} ORPHANED_CRD_GROUPS="${ORPHANED_CRD_GROUPS} kai.scheduler scheduling.run.ai"{{ end }}
-{{- if eq .Name "gpu-operator" }} ORPHANED_CRD_GROUPS="${ORPHANED_CRD_GROUPS} nvidia.com nfd.k8s-sigs.io"{{ end }}
+{{- if and (eq .Name "gpu-operator") (not .IsOLM) }} ORPHANED_CRD_GROUPS="${ORPHANED_CRD_GROUPS} nvidia.com nfd.k8s-sigs.io"{{ end }}
 {{- if eq .Name "dynamo-platform" }} ORPHANED_CRD_GROUPS="${ORPHANED_CRD_GROUPS} grove.io scheduler.grove.io"{{ end }}
 {{- if eq .Name "kube-prometheus-stack" }} ORPHANED_CRD_GROUPS="${ORPHANED_CRD_GROUPS} monitoring.coreos.com"{{ end }}
 {{- if eq .Name "k8s-nim-operator" }} ORPHANED_CRD_GROUPS="${ORPHANED_CRD_GROUPS} apps.nvidia.com"{{ end }}

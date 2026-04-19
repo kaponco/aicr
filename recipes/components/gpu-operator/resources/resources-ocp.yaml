@@ -23,8 +23,6 @@ spec:
     defaultRuntime: crio
   driver:
     enabled: true
-    usePrecompiled: true
-    version: "570.86.15"
     rdma:
       enabled: true
       useHostMofed: false
