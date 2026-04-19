@@ -140,6 +140,12 @@ components:
       defaultRepository: https://helm.ngc.nvidia.com/nvidia
       defaultChart: nvidia/network-operator
       defaultNamespace: nvidia-network-operator
+    olm:
+      defaultNamespace: nvidia-network-operator
+      installFiles:
+        - components/network-operator/olm/install.yaml
+      kinds:
+        - NicClusterPolicy
     nodeScheduling:
       system:
         nodeSelectorPaths:

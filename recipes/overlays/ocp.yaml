@@ -38,6 +38,10 @@ spec:
     - name: K8s.crd.nodefeaturediscoveries.nfd.openshift.io.established
       value: "true"
 
+    # Verify Network Operator NicClusterPolicy CRD is established
+    - name: K8s.crd.nicclusterpolicies.mellanox.com.established
+      value: "true"
+
   # OCP-specific components deployed via OLM
   componentRefs:
     # NFD Operator deployed via OLM (Operator Lifecycle Manager)
@@ -53,6 +57,14 @@ spec:
       resourcesFile: components/gpu-operator/resources/resources-ocp.yaml
       dependencyRefs:
         - nfd-operator
+
+    # Network Operator deployed via OLM (Operator Lifecycle Manager)
+    # Provides RDMA and networking capabilities for GPU workloads
+    - name: network-operator
+      type: OLM
+      resourcesFile: components/network-operator/resources/resources-ocp.yaml
+      dependencyRefs:
+        - gpu-operator
 
     # Disable all base components to prevent inheritance
     - name: cert-manager

@@ -588,11 +588,13 @@ delete_namespace "{{ . }}"
 delete_namespace "kai-resource-reservation"
 
 # Wait for terminating namespaces to finish
-echo "Waiting for namespaces to terminate..."
 for i in $(seq 1 60); do
   TERMINATING=$(kubectl get ns --no-headers 2>/dev/null | grep Terminating | awk '{print $1}' || true)
   if [[ -z "${TERMINATING}" ]]; then
     break
+  fi
+  if [[ $i -eq 1 ]]; then
+    echo "Waiting for namespaces to terminate..."
   fi
   if [[ $i -eq 60 ]]; then
     echo "Warning: namespaces still terminating after 60s: ${TERMINATING}"
