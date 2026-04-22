@@ -126,6 +126,10 @@ jobs:
             ${{ env.GKE_ACTUATOR_IMAGE }} apply
 
       # Connect
+      - name: Install GKE auth plugin
+        if: steps.infra.outcome == 'success'
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
+
       - name: Connect to Cluster
         id: client
         if: steps.infra.outcome == 'success'
