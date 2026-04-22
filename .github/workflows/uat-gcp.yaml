@@ -125,7 +125,7 @@ jobs:
         run: |
           set -euox pipefail
           yq -i '.deployment.id = strenv(DEPLOYMENT_ID)' "$CLUSTER_CONFIG"
-          yq -i '.cluster.name = strenv(DEPLOYMENT_ID)' "$CLUSTER_CONFIG"
+          yq -i '.cluster.gke.name = strenv(DEPLOYMENT_ID)' "$CLUSTER_CONFIG"
           cat "$CLUSTER_CONFIG"
 
       # Bringup
