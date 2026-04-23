@@ -17,7 +17,7 @@
 apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
-  name: gpu-cluster-policy
+  name: cluster-policy
 spec:
   dcgm:
     enabled: true

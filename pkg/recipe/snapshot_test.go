@@ -174,6 +174,30 @@ func TestExtractCriteriaFromSnapshot(t *testing.T) {
 			},
 		},
 		{
+			name: "K8s service OCP from OS release OPENSHIFT_VERSION",
+			snapshot: &snapshotter.Snapshot{
+				Measurements: []*measurement.Measurement{
+					{
+						Type: measurement.TypeOS,
+						Subtypes: []measurement.Subtype{
+							{
+								Name: "release",
+								Data: map[string]measurement.Reading{
+									"OPENSHIFT_VERSION": measurement.Str("4.18"),
+									"ID":                measurement.Str("rhcos"),
+								},
+							},
+						},
+					},
+				},
+			},
+			validate: func(t *testing.T, c *Criteria) {
+				if c.Service != CriteriaServiceOCP {
+					t.Errorf("Service = %v, want %v", c.Service, CriteriaServiceOCP)
+				}
+			},
+		},
+		{
 			name: "GPU RTX PRO 6000 from model field",
 			snapshot: &snapshotter.Snapshot{
 				Measurements: []*measurement.Measurement{

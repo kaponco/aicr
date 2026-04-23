@@ -106,3 +106,13 @@ spec:
       type: Helm
       overrides:
         enabled: false
+
+  # Validation configuration for OCP deployments
+  validation:
+    deployment:
+      checks:
+        - operator-health
+        - expected-resources
+      constraints:
+        - name: Deployment.gpu-operator.version
+          value: ">= v24.6.0"

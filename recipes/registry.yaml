@@ -113,7 +113,7 @@ components:
       defaultChart: nvidia/gpu-operator
       defaultNamespace: gpu-operator
     olm:
-      defaultNamespace: nvidia-gpu-operator
+      defaultNamespace: gpu-operator
       installFiles:
         - components/gpu-operator/olm/install.yaml
       kinds:

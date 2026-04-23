@@ -2500,7 +2500,7 @@ func TestGenerate_OLMComponents(t *testing.T) {
 				"components/nfd-operator/cr-node-feature-discovery.yaml": []byte("apiVersion: nfd.openshift.io/v1\nkind: NodeFeatureDiscovery\nmetadata:\n  name: nfd-instance\n"),
 			},
 			"gpu-operator": {
-				"components/gpu-operator/cr-cluster-policy-ocp.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\nmetadata:\n  name: gpu-cluster-policy\n"),
+				"components/gpu-operator/cr-cluster-policy-ocp.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\nmetadata:\n  name: cluster-policy\n"),
 			},
 		},
 		Version:          "v0.11.1",

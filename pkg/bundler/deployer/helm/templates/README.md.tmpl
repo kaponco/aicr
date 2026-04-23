@@ -156,7 +156,7 @@ kubectl apply -f {{ .Name }}/manifests/
 {{ end }}
 {{ end }}
 
-## Customization
+## Helm Customization
 
 Each Helm component has two values files in its directory:
 
@@ -173,7 +173,7 @@ Each Helm component has two values files in its directory:
   alongside `values.yaml` by both `deploy.sh` and the per-component commands
   in the "Manual Installation" section above.
 
-## Upgrade
+## Helm Upgrade
 
 To upgrade a specific Helm component:
 

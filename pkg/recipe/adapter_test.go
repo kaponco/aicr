@@ -692,7 +692,7 @@ func TestGetMergedCustomResource(t *testing.T) {
 				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
-  name: gpu-cluster-policy
+  name: cluster-policy
 spec:
   driver:
     enabled: true
@@ -702,7 +702,7 @@ spec:
 				"components/gpu-operator/resources/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
-  name: gpu-cluster-policy
+  name: cluster-policy
 spec:
   dcgm:
     enabled: true
@@ -722,7 +722,7 @@ spec:
 				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
-  name: gpu-cluster-policy
+  name: cluster-policy
 spec:
   driver:
     enabled: true`,
@@ -759,13 +759,13 @@ metadata:
 				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
-  name: gpu-cluster-policy
+  name: cluster-policy
 spec:
   driver: [invalid yaml structure`,
 				"components/gpu-operator/resources/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
-  name: gpu-cluster-policy
+  name: cluster-policy
 spec:
   mig:
     strategy: mixed`,
@@ -779,7 +779,7 @@ spec:
 				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
-  name: gpu-cluster-policy
+  name: cluster-policy
 spec:
   driver:
     enabled: true`,

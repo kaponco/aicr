@@ -82,6 +82,10 @@ func ExtractCriteriaFromSnapshot(snap *snapshotter.Snapshot) *Criteria {
 		case measurement.TypeOS:
 			for _, st := range m.Subtypes {
 				if st.Name == "release" {
+					if _, ok := st.Data["OPENSHIFT_VERSION"]; ok {
+						criteria.Service = CriteriaServiceOCP
+					}
+
 					if osID, ok := st.Data["ID"]; ok {
 						if parsed, err := ParseCriteriaOSType(osID.String()); err == nil {
 							criteria.OS = parsed

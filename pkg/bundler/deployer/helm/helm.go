@@ -72,6 +72,7 @@ type ComponentData struct {
 	CustomResources []CustomResourceData // Custom resources for OLM components
 	HasInstallFiles bool                 // True when the component has OLM install files
 	InstallFiles    []InstallFileData    // OLM install files (Subscription, OperatorGroup, etc.)
+	Service         string               // Kubernetes service type (ocp, eks, gke, etc.)
 }
 
 // CustomResourceData contains data for a custom resource file.
@@ -245,6 +246,12 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 		componentMap[ref.Name] = ref
 	}
 
+	// Extract service from criteria
+	var service string
+	if input.RecipeResult != nil && input.RecipeResult.Criteria != nil {
+		service = string(input.RecipeResult.Criteria.Service)
+	}
+
 	// Sort by deployment order
 	sorted := deployer.SortComponentRefsByDeploymentOrder(
 		g.RecipeResult.ComponentRefs,
@@ -324,6 +331,7 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 			CustomResources: customResources,
 			HasInstallFiles: hasInstallFiles,
 			InstallFiles:    installFiles,
+			Service:         service,
 		})
 	}
 
