@@ -20,3 +20,23 @@ exclude:
   - './aicr'
   - './aicrd'
   - './dist/**'
+
+# CVE suppressions for aiperf-bench base image (nvcr.io/nvidia/distroless/python:3.13-v4.0.4).
+# All are either unfixed upstream, won't-fix in Debian, or have no available patch.
+# Reviewed: 2026-04-24
+ignore:
+  # python 3.13.13 binary — no fix available
+  - vulnerability: CVE-2026-6100   # Critical, python binary
+  - vulnerability: CVE-2026-3298   # High, python binary
+  - vulnerability: CVE-2026-4786   # High, python binary
+  # libc6 2.41 — won't fix in Debian
+  - vulnerability: CVE-2026-5450   # Critical, libc6 (won't fix)
+  - vulnerability: CVE-2026-4437   # High, libc6 (won't fix)
+  - vulnerability: CVE-2026-4046   # High, libc6 (won't fix)
+  - vulnerability: CVE-2026-5928   # High, libc6 (won't fix)
+  # libexpat1 2.7.1 — won't fix in Debian
+  - vulnerability: CVE-2025-59375  # High, libexpat1 (won't fix)
+  - vulnerability: CVE-2026-41080  # High, libexpat1 (won't fix)
+  - vulnerability: CVE-2026-25210  # High, libexpat1 (won't fix)
+  # libncursesw6/libtinfo6 6.5 — won't fix in Debian
+  - vulnerability: CVE-2025-69720  # High, libncursesw6/libtinfo6 (won't fix)
