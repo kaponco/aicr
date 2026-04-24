@@ -37,3 +37,6 @@ ignore:
   - vulnerability: CVE-2026-5928   # High
   # ncurses 6.5 — won't fix in Debian
   - vulnerability: CVE-2025-69720  # High
+  # aiperf pip dependencies
+  - vulnerability: GHSA-whj4-6x5x-4v2j  # High, pillow (fix in 12.2.0, pinned by aiperf)
+  - vulnerability: CVE-2026-4519   # python binary
