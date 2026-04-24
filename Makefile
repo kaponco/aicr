@@ -371,6 +371,10 @@ bump-promote: ## Promotes a pre-release to stable on the same SHA. Use TAG=v1.2.
 changelog: ## Shows changes since the last release
 	@tools/changelog
 
+.PHONY: changelog-file
+changelog-file: ## Updates CHANGELOG.md with changes since the last release
+	@tools/changelog --file
+
 .PHONY: clean
 clean: ## Cleans build artifacts (dist, coverage files)
 	@rm -rf ./dist ./bin ./coverage.out
@@ -714,6 +718,7 @@ help-full: ## Displays commands grouped by category
 	@echo "  make bump-minor     Tag minor version (1.2.3 -> 1.3.0)"
 	@echo "  make bump-major     Tag major version (1.2.3 -> 2.0.0)"
 	@echo "  make changelog      Show changes since last release"
+	@echo "  make changelog-file Update CHANGELOG.md with unreleased changes"
 	@echo ""
 	@echo "\033[1m=== Local Development ===\033[0m"
 	@echo "  make dev-env        Create cluster and start Tilt (full setup)"
