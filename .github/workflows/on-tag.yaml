@@ -315,7 +315,7 @@ jobs:
           output-format: sarif
           only-fixed: true
           fail-build: true
-          grype-config: .grype.yaml
+          config: .grype.yaml
         continue-on-error: true
 
       - name: Upload SARIF to GitHub Security
