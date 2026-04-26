@@ -77,7 +77,7 @@ spec:
       overrides:
         enabled: false
 
-    - name: skyhook-operator
+    - name: nodewright-operator
       type: Helm
       overrides:
         enabled: false
