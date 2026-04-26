@@ -45,11 +45,11 @@ var deployScriptTemplate string
 //go:embed templates/undeploy.sh.tmpl
 var undeployScriptTemplate string
 
-//go:embed templates/olm_install.sh.tmpl
-var olmInstallScriptTemplate string
+//go:embed templates/subscribe.sh.tmpl
+var subscribeScriptTemplate string
 
-//go:embed templates/olm_uninstall.sh.tmpl
-var olmUninstallScriptTemplate string
+//go:embed templates/unsubscribe.sh.tmpl
+var unsubscribeScriptTemplate string
 
 // criteriaAny is the wildcard value for criteria fields.
 const criteriaAny = "any"
@@ -168,22 +168,22 @@ func (g *Generator) Generate(ctx context.Context, outputDir string) (*deployer.O
 	output.Files = append(output.Files, readmePath)
 	output.TotalSize += readmeSize
 
-	// Generate install.sh (for OLM components)
-	installPath, installSize, err := g.generateInstallScript(ctx, components, outputDir)
+	// Generate subscribe.sh (for OLM components)
+	installPath, installSize, err := g.generateSubscribeScript(ctx, components, outputDir)
 	if err != nil {
 		return nil, errors.Wrap(errors.ErrCodeInternal,
-			"failed to generate olm_install.sh", err)
+			"failed to generate subscribe.sh", err)
 	}
 	if installPath != "" {
 		output.Files = append(output.Files, installPath)
 		output.TotalSize += installSize
 	}
 
-	// Generate olm_uninstall.sh (for OLM components)
-	uninstallPath, uninstallSize, err := g.generateOLMUninstallScript(ctx, components, outputDir)
+	// Generate unsubscribe.sh (for OLM components)
+	uninstallPath, uninstallSize, err := g.generateUnsubscribeScript(ctx, components, outputDir)
 	if err != nil {
 		return nil, errors.Wrap(errors.ErrCodeInternal,
-			"failed to generate olm_uninstall.sh", err)
+			"failed to generate unsubscribe.sh", err)
 	}
 	if uninstallPath != "" {
 		output.Files = append(output.Files, uninstallPath)
@@ -691,9 +691,9 @@ func (g *Generator) generateUndeployScript(ctx context.Context, components []Com
 	return undeployPath, undeploySize, nil
 }
 
-// generateInstallScript creates the install.sh automation script for OLM components.
+// generateSubscribeScript creates the subscribe.sh automation script for OLM components.
 // Only generates the script if there are components with install files.
-func (g *Generator) generateInstallScript(ctx context.Context, components []ComponentData, outputDir string) (string, int64, error) {
+func (g *Generator) generateSubscribeScript(ctx context.Context, components []ComponentData, outputDir string) (string, int64, error) {
 	if err := ctx.Err(); err != nil {
 		return "", 0, err
 	}
@@ -742,24 +742,24 @@ func (g *Generator) generateInstallScript(ctx context.Context, components []Comp
 		OLMComponents:  olmComponents,
 	}
 
-	installPath, installSize, err := deployer.GenerateFromTemplate(olmInstallScriptTemplate, data, outputDir, "olm_install.sh")
+	installPath, installSize, err := deployer.GenerateFromTemplate(subscribeScriptTemplate, data, outputDir, "subscribe.sh")
 	if err != nil {
 		return "", 0, err
 	}
 
 	// Make executable
 	if err := os.Chmod(installPath, 0755); err != nil {
-		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set olm_install.sh permissions", err)
+		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set subscribe.sh permissions", err)
 	}
 
-	slog.Debug("generated olm_install.sh script")
+	slog.Debug("generated subscribe.sh script")
 
 	return installPath, installSize, nil
 }
 
-// generateOLMUninstallScript creates the olm_uninstall.sh automation script for OLM components.
+// generateUnsubscribeScript creates the unsubscribe.sh automation script for OLM components.
 // Only generates the script if there are components with install files.
-func (g *Generator) generateOLMUninstallScript(ctx context.Context, components []ComponentData, outputDir string) (string, int64, error) {
+func (g *Generator) generateUnsubscribeScript(ctx context.Context, components []ComponentData, outputDir string) (string, int64, error) {
 	if err := ctx.Err(); err != nil {
 		return "", 0, err
 	}
@@ -814,17 +814,17 @@ func (g *Generator) generateOLMUninstallScript(ctx context.Context, components [
 		OLMComponents:  olmComponentsReversed,
 	}
 
-	uninstallPath, uninstallSize, err := deployer.GenerateFromTemplate(olmUninstallScriptTemplate, data, outputDir, "olm_uninstall.sh")
+	uninstallPath, uninstallSize, err := deployer.GenerateFromTemplate(unsubscribeScriptTemplate, data, outputDir, "unsubscribe.sh")
 	if err != nil {
 		return "", 0, err
 	}
 
 	// Make executable
 	if err := os.Chmod(uninstallPath, 0755); err != nil {
-		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set olm_uninstall.sh permissions", err)
+		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set unsubscribe.sh permissions", err)
 	}
 
-	slog.Debug("generated olm_uninstall.sh script")
+	slog.Debug("generated unsubscribe.sh script")
 
 	return uninstallPath, uninstallSize, nil
 }
@@ -866,7 +866,7 @@ func reverseComponents(components []ComponentData) []ComponentData {
 
 // uniqueNamespaces returns deduplicated namespaces from Helm/Kustomize components,
 // preserving order. Manifest-only components and OLM components are excluded.
-// OLM namespaces are managed by olm_uninstall.sh instead.
+// OLM namespaces are managed by unsubscribe.sh instead.
 func uniqueNamespaces(components []ComponentData) []string {
 	seen := make(map[string]bool)
 	var namespaces []string
