@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
-	"maps"
 	"path/filepath"
 	"sort"
 	"strings"
