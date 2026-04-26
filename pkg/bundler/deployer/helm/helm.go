@@ -248,8 +248,8 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 
 	// Extract service from criteria
 	var service string
-	if input.RecipeResult != nil && input.RecipeResult.Criteria != nil {
-		service = string(input.RecipeResult.Criteria.Service)
+	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
+		service = string(g.RecipeResult.Criteria.Service)
 	}
 
 	// Sort by deployment order
@@ -339,6 +339,8 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 }
 
 // generateComponentDirectories creates per-component directories with values.yaml, README.md, and optional manifests.
+//
+//nolint:funlen // Function orchestrates multiple generation steps (values, manifests, OLM resources)
 func (g *Generator) generateComponentDirectories(ctx context.Context, components []ComponentData, outputDir string) ([]string, int64, error) {
 	files := make([]string, 0, len(components)*3)
 	var totalSize int64
@@ -373,7 +375,9 @@ func (g *Generator) generateComponentDirectories(ctx context.Context, components
 			files = append(files, clusterFiles...)
 			totalSize += clusterSize
 
-			valuesPath, valuesSize, err := deployer.WriteValuesFile(values, componentDir, "values.yaml")
+			var valuesPath string
+			var valuesSize int64
+			valuesPath, valuesSize, err = deployer.WriteValuesFile(values, componentDir, "values.yaml")
 			if err != nil {
 				return nil, 0, errors.Wrap(errors.ErrCodeInternal,
 					fmt.Sprintf("failed to write values.yaml for %s", comp.Name), err)

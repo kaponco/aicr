@@ -32,4 +32,4 @@ spec:
       type: OLM
       resourcesFile: components/gpu-operator/resources/resources-ocp-training.yaml
 
-  # Validation configuration for OCP training deployments - currently no validation for ocp training
+# Validation configuration for OCP training deployments - currently no validation for ocp training
