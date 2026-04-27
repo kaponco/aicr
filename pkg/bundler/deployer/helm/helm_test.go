@@ -2499,6 +2499,14 @@ func TestGenerate_OLMComponents(t *testing.T) {
 				"components/gpu-operator/cr-cluster-policy-ocp.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\nmetadata:\n  name: cluster-policy\n"),
 			},
 		},
+		ComponentInstallFiles: map[string]map[string][]byte{
+			"nfd-operator": {
+				"components/nfd-operator/olm/install.yaml": []byte("apiVersion: operators.coreos.com/v1alpha1\nkind: Subscription\nmetadata:\n  name: nfd\n  namespace: {{NAMESPACE}}\nspec:\n  channel: stable\n  name: nfd\n  source: redhat-operators\n  sourceNamespace: openshift-marketplace\n"),
+			},
+			"gpu-operator": {
+				"components/gpu-operator/olm/install.yaml": []byte("apiVersion: operators.coreos.com/v1alpha1\nkind: Subscription\nmetadata:\n  name: gpu-operator-certified\n  namespace: {{NAMESPACE}}\nspec:\n  channel: v25.10\n  name: gpu-operator-certified\n  source: certified-operators\n  sourceNamespace: openshift-marketplace\n"),
+			},
+		},
 		Version:          "v0.11.1",
 		IncludeChecksums: true,
 	}
@@ -2560,6 +2568,93 @@ func TestGenerate_OLMComponents(t *testing.T) {
 	}
 	if !strings.Contains(string(undeployContent), "kubectl delete -f resources.yaml -n nvidia-gpu-operator") {
 		t.Error("undeploy.sh does not contain GPU Operator custom resource deletion with namespace")
+	}
+
+	// Verify install.yaml files were copied per component with namespace substitution
+	nfdInstall := filepath.Join(outputDir, "nfd-operator", "install.yaml")
+	nfdInstallContent, err := os.ReadFile(nfdInstall)
+	if err != nil {
+		t.Errorf("NFD install.yaml not found: %v", err)
+	} else {
+		installStr := string(nfdInstallContent)
+		if strings.Contains(installStr, "{{NAMESPACE}}") {
+			t.Error("NFD install.yaml still contains {{NAMESPACE}} placeholder - substitution failed")
+		}
+		if !strings.Contains(installStr, "namespace: openshift-nfd") {
+			t.Error("NFD install.yaml does not contain substituted namespace 'openshift-nfd'")
+		}
+		if !strings.Contains(installStr, "kind: Subscription") {
+			t.Error("NFD install.yaml does not contain Subscription")
+		}
+	}
+
+	gpuInstall := filepath.Join(outputDir, "gpu-operator", "install.yaml")
+	gpuInstallContent, err := os.ReadFile(gpuInstall)
+	if err != nil {
+		t.Errorf("GPU Operator install.yaml not found: %v", err)
+	} else {
+		installStr := string(gpuInstallContent)
+		if strings.Contains(installStr, "{{NAMESPACE}}") {
+			t.Error("GPU Operator install.yaml still contains {{NAMESPACE}} placeholder - substitution failed")
+		}
+		if !strings.Contains(installStr, "namespace: nvidia-gpu-operator") {
+			t.Error("GPU Operator install.yaml does not contain substituted namespace 'nvidia-gpu-operator'")
+		}
+		if !strings.Contains(installStr, "kind: Subscription") {
+			t.Error("GPU Operator install.yaml does not contain Subscription")
+		}
+	}
+
+	// Verify subscribe.sh was generated and contains OLM installation commands
+	subscribeScript := filepath.Join(outputDir, "subscribe.sh")
+	subscribeContent, err := os.ReadFile(subscribeScript)
+	if err != nil {
+		t.Errorf("subscribe.sh not found: %v", err)
+	} else {
+		subscribeStr := string(subscribeContent)
+		if !strings.Contains(subscribeStr, "Installing OLM Components") {
+			t.Error("subscribe.sh does not contain 'Installing OLM Components' header")
+		}
+		if !strings.Contains(subscribeStr, "nfd-operator") {
+			t.Error("subscribe.sh does not mention nfd-operator")
+		}
+		if !strings.Contains(subscribeStr, "gpu-operator") {
+			t.Error("subscribe.sh does not mention gpu-operator")
+		}
+		if !strings.Contains(subscribeStr, "kubectl apply -f") && !strings.Contains(subscribeStr, "kubectl create -f") {
+			t.Error("subscribe.sh does not contain kubectl apply/create commands")
+		}
+		if !strings.Contains(subscribeStr, "install.yaml") {
+			t.Error("subscribe.sh does not reference install.yaml")
+		}
+	}
+
+	// Verify unsubscribe.sh was generated and contains OLM uninstallation commands
+	unsubscribeScript := filepath.Join(outputDir, "unsubscribe.sh")
+	unsubscribeContent, err := os.ReadFile(unsubscribeScript)
+	if err != nil {
+		t.Errorf("unsubscribe.sh not found: %v", err)
+	} else {
+		unsubscribeStr := string(unsubscribeContent)
+		if !strings.Contains(unsubscribeStr, "Uninstalling OLM Components") {
+			t.Error("unsubscribe.sh does not contain 'Uninstalling OLM Components' header")
+		}
+		if !strings.Contains(unsubscribeStr, "nfd-operator") {
+			t.Error("unsubscribe.sh does not mention nfd-operator")
+		}
+		if !strings.Contains(unsubscribeStr, "gpu-operator") {
+			t.Error("unsubscribe.sh does not mention gpu-operator")
+		}
+		if !strings.Contains(unsubscribeStr, "kubectl delete") {
+			t.Error("unsubscribe.sh does not contain kubectl delete commands")
+		}
+		if !strings.Contains(unsubscribeStr, "install.yaml") {
+			t.Error("unsubscribe.sh does not reference install.yaml for deletion")
+		}
+		// Verify reverse order comment is present
+		if !strings.Contains(unsubscribeStr, "reverse order") {
+			t.Error("unsubscribe.sh does not mention reverse order uninstallation")
+		}
 	}
 }
 

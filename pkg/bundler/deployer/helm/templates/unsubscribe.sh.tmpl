@@ -17,30 +17,27 @@ echo "==> Uninstalling OLM Components"
 echo ""
 
 # Uninstall in reverse order (dependencies last) to avoid breaking dependent operators
-{{- $components := .OLMComponents }}
-{{- $count := len $components }}
-{{- range $i := until $count }}
-{{- $idx := sub (sub $count 1) $i }}
-{{- $comp := index $components $idx }}
+# Note: Components list is already reversed by the generator
+{{- range .OLMComponents }}
 
-echo "==> Uninstalling {{ $comp.Name }}"
+echo "==> Uninstalling {{ .Name }}"
 
 # Delete custom resources first to allow operator cleanup
-if [ -f "${SCRIPT_DIR}/{{ $comp.Name }}/resources.yaml" ]; then
-  echo "    Deleting custom resources for {{ $comp.Name }}"
-  kubectl delete -f "${SCRIPT_DIR}/{{ $comp.Name }}/resources.yaml" --ignore-not-found --timeout=60s
+if [ -f "${SCRIPT_DIR}/{{ .Name }}/resources.yaml" ]; then
+  echo "    Deleting custom resources for {{ .Name }}"
+  kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/resources.yaml" --ignore-not-found --timeout=60s
 fi
 
 # Delete OLM installation manifests (Subscription, OperatorGroup)
-echo "    Deleting {{ $comp.Name }}/install.yaml"
-kubectl delete -f "${SCRIPT_DIR}/{{ $comp.Name }}/install.yaml" --ignore-not-found
+echo "    Deleting {{ .Name }}/install.yaml"
+kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/install.yaml" --ignore-not-found
 
 # Delete CSV (ClusterServiceVersion) for this specific operator
 # Note: This targets CSVs in the component's namespace only
-echo "    Waiting for CSV cleanup in namespace {{ $comp.Namespace }}"
-kubectl wait csv --all --for=delete -n {{ $comp.Namespace }} --timeout=60s 2>/dev/null || true
+echo "    Waiting for CSV cleanup in namespace {{ .Namespace }}"
+kubectl wait csv --all --for=delete -n {{ .Namespace }} --timeout=60s 2>/dev/null || true
 
-echo "    ✓ {{ $comp.Name }} uninstalled"
+echo "    ✓ {{ .Name }} uninstalled"
 echo ""
 {{- end }}
 
