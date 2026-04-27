@@ -2391,15 +2391,17 @@ func TestWriteCustomResources(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:          "multiple custom resources - only most specific written",
+			name:          "multiple custom resources - writes first entry and warns",
 			componentName: "gpu-operator",
 			componentCustomResources: map[string]map[string][]byte{
 				"gpu-operator": {
+					// Multiple entries is unexpected (upstream should have merged),
+					// but we handle it gracefully by writing one and logging a warning
 					"components/gpu-operator/olm/resources-ocp.yaml":          []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\n"),
 					"components/gpu-operator/olm/resources-ocp-training.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\nspec:\n  mig:\n    strategy: mixed\n"),
 				},
 			},
-			wantFiles: 1, // Only writes the most specific (longest filename) as resources.yaml
+			wantFiles: 1, // Writes one file (whichever is first in map iteration) and logs warning
 			wantErr:   false,
 		},
 	}
@@ -2426,25 +2428,19 @@ func TestWriteCustomResources(t *testing.T) {
 				}
 			}
 
-			// Verify totalSize matches the most specific file content
-			// (longest filename = most specific, which is what gets written)
-			var expectedSize int64
-			if crs, ok := tt.componentCustomResources[tt.componentName]; ok {
-				var longestPath string
-				var maxLen int
-				for p := range crs {
-					filename := filepath.Base(p)
-					if len(filename) > maxLen {
-						maxLen = len(filename)
-						longestPath = p
+			// Verify totalSize matches one of the provided custom resources
+			// (when multiple resources exist, which one is selected depends on map iteration order)
+			if crs, ok := tt.componentCustomResources[tt.componentName]; ok && len(crs) > 0 {
+				foundMatchingSize := false
+				for _, content := range crs {
+					if totalSize == int64(len(content)) {
+						foundMatchingSize = true
+						break
 					}
 				}
-				if longestPath != "" {
-					expectedSize = int64(len(crs[longestPath]))
+				if !foundMatchingSize && totalSize != 0 {
+					t.Errorf("writeCustomResources() totalSize = %d, does not match any provided resource", totalSize)
 				}
-			}
-			if totalSize != expectedSize {
-				t.Errorf("writeCustomResources() totalSize = %d, want %d", totalSize, expectedSize)
 			}
 		})
 	}

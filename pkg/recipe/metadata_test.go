@@ -1329,10 +1329,9 @@ func TestDiscoverCustomResources(t *testing.T) {
 			files: map[string]string{
 				"components/gpu-operator/olm/resources-ocp.yaml":          "kind: ClusterPolicy",
 				"components/gpu-operator/olm/resources-ocp-training.yaml": "kind: ClusterPolicy",
-				"components/gpu-operator/olm/config.yaml":                 "kind: Config",
+				"components/gpu-operator/olm/install.yaml":                "kind: Subscription",
 			},
 			expected: []string{
-				"components/gpu-operator/olm/config.yaml",
 				"components/gpu-operator/olm/resources-ocp-training.yaml",
 				"components/gpu-operator/olm/resources-ocp.yaml",
 			},
@@ -1341,46 +1340,47 @@ func TestDiscoverCustomResources(t *testing.T) {
 			name:    "directory with yml extension",
 			dirPath: "components/nfd-operator/olm",
 			files: map[string]string{
-				"components/nfd-operator/olm/config.yml":    "kind: NodeFeatureDiscovery",
+				"components/nfd-operator/olm/install.yml":   "kind: Subscription",
 				"components/nfd-operator/olm/resources.yml": "kind: NodeFeatureDiscovery",
 			},
 			expected: []string{
-				"components/nfd-operator/olm/config.yml",
 				"components/nfd-operator/olm/resources.yml",
 			},
 		},
 		{
-			name:    "directory with mixed files - only yaml/yml included",
+			name:    "directory with mixed files - only resources*.yaml/yml included",
 			dirPath: "components/test/olm",
 			files: map[string]string{
-				"components/test/olm/resource.yaml": "kind: Test",
-				"components/test/olm/readme.md":     "# README",
-				"components/test/olm/script.sh":     "#!/bin/bash",
-				"components/test/olm/config.json":   "{}",
-				"components/test/olm/data.txt":      "data",
+				"components/test/olm/resources-base.yaml": "kind: Test",
+				"components/test/olm/install.yaml":        "kind: Subscription",
+				"components/test/olm/readme.md":           "# README",
+				"components/test/olm/script.sh":           "#!/bin/bash",
+				"components/test/olm/config.json":         "{}",
+				"components/test/olm/data.txt":            "data",
 			},
 			expected: []string{
-				"components/test/olm/resource.yaml",
+				"components/test/olm/resources-base.yaml",
 			},
 		},
 		{
-			name:    "directory with both yaml and yml extensions",
+			name:    "directory with both yaml and yml extensions - only resources* files",
 			dirPath: "components/mixed/olm",
 			files: map[string]string{
-				"components/mixed/olm/a.yaml": "kind: A",
-				"components/mixed/olm/b.yml":  "kind: B",
-				"components/mixed/olm/c.yaml": "kind: C",
+				"components/mixed/olm/resources-a.yaml": "kind: A",
+				"components/mixed/olm/resources-b.yml":  "kind: B",
+				"components/mixed/olm/install.yaml":     "kind: Subscription",
 			},
 			expected: []string{
-				"components/mixed/olm/a.yaml",
-				"components/mixed/olm/b.yml",
-				"components/mixed/olm/c.yaml",
+				"components/mixed/olm/resources-a.yaml",
+				"components/mixed/olm/resources-b.yml",
 			},
 		},
 		{
-			name:     "empty directory",
-			dirPath:  "components/empty/olm",
-			files:    map[string]string{},
+			name:    "empty directory",
+			dirPath: "components/empty/olm",
+			files: map[string]string{
+				"components/empty/olm/.gitkeep": "", // Create directory entry
+			},
 			expected: nil,
 		},
 		{
@@ -1390,15 +1390,16 @@ func TestDiscoverCustomResources(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:    "directory with subdirectories - includes nested files",
-			dirPath: "components/nested/resources",
+			name:    "directory with subdirectories - includes nested resources files",
+			dirPath: "components/nested/olm",
 			files: map[string]string{
-				"components/nested/resources/root.yaml":          "kind: Root",
-				"components/nested/resources/subdir/nested.yaml": "kind: Nested",
+				"components/nested/olm/resources-root.yaml":          "kind: Root",
+				"components/nested/olm/install.yaml":                 "kind: Subscription",
+				"components/nested/olm/subdir/resources-nested.yaml": "kind: Nested",
 			},
 			expected: []string{
-				"components/nested/resources/root.yaml",
-				"components/nested/resources/subdir/nested.yaml",
+				"components/nested/olm/resources-root.yaml",
+				"components/nested/olm/subdir/resources-nested.yaml",
 			},
 		},
 	}

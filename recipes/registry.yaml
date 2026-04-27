@@ -38,7 +38,9 @@
 #   nodeScheduling:    Paths in Helm values where node selectors/tolerations are injected
 #
 # Note: A component must have either 'helm', 'kustomize', OR 'olm' configuration.
-# For OLM components, resourcesDir is specified in overlays (e.g., recipes/overlays/ocp.yaml).
+# Some components (nfd, gpu-operator, network-operator) define both 'helm' and 'olm'
+# to support both standard K8s and OpenShift deployments. Overlays select the appropriate type.
+# For OLM components, resourcesFile is specified in overlays (e.g., recipes/overlays/ocp.yaml).
 # Node scheduling paths define WHERE CLI flags like --system-node-selector are applied.
 # The actual values come from CLI flags, not from this file.
 #

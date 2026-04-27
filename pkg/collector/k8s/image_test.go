@@ -90,6 +90,17 @@ func TestImageCollector_Collect(t *testing.T) {
 	// Should have 5 subtypes: server, image, policy, node, crd
 	assert.Len(t, m.Subtypes, 5)
 
+	// Verify all expected subtypes are present
+	subtypeNames := make(map[string]bool)
+	for _, st := range m.Subtypes {
+		subtypeNames[st.Name] = true
+	}
+	assert.True(t, subtypeNames["server"], "missing server subtype")
+	assert.True(t, subtypeNames["image"], "missing image subtype")
+	assert.True(t, subtypeNames["policy"], "missing policy subtype")
+	assert.True(t, subtypeNames["node"], "missing node subtype")
+	assert.True(t, subtypeNames["crd"], "missing crd subtype")
+
 	// Find the image subtype
 	var imageSubtype *measurement.Subtype
 	for i := range m.Subtypes {

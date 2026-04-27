@@ -157,6 +157,20 @@ func TestDeployer_EnsureRBAC(t *testing.T) {
 		if len(cr.Rules) != 4 {
 			t.Errorf("expected 4 rules, got %d", len(cr.Rules))
 		}
+
+		// Verify CRD rule content
+		hasCRDRule := false
+		for _, rule := range cr.Rules {
+			if len(rule.APIGroups) == 1 && rule.APIGroups[0] == "apiextensions.k8s.io" &&
+				len(rule.Resources) == 1 && rule.Resources[0] == "customresourcedefinitions" &&
+				containsVerb(rule.Verbs, "get") && containsVerb(rule.Verbs, "list") {
+				hasCRDRule = true
+				break
+			}
+		}
+		if !hasCRDRule {
+			t.Errorf("expected CRD read rule (apiextensions.k8s.io/customresourcedefinitions get,list)")
+		}
 	})
 
 	// Test ClusterRoleBinding creation

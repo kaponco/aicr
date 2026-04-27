@@ -1478,7 +1478,7 @@ func TestCollectComponentCustomResources(t *testing.T) {
 				{
 					Name:            "nfd",
 					Type:            recipe.ComponentTypeOLM,
-					CustomResources: []string{"components/nfd/cr-node-feature-discovery.yaml"},
+					CustomResources: []string{"components/nfd/olm/resources-ocp.yaml"},
 				},
 			},
 		}

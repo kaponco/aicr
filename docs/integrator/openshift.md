@@ -25,7 +25,7 @@ The Operator Lifecycle Manager provides a declarative approach to managing opera
 
 The Subscription and the Custom Resource (CR) follow independent lifecycles: the Subscription bootstraps the operator environment
 while the CR acts as the ongoing trigger for the operator to provision and manage the workload.
-This distinction creates two separate operational flows — one for the operator instalation (i.e. subscription) and one for the workload deployment.
+This distinction creates two separate operational flows — one for the operator installation (i.e. subscription) and one for the workload deployment.
 
 **OpenShift-Specific Constraints:**
 
@@ -199,9 +199,10 @@ Deployment complete.
 watch kubectl get pods -n gpu-operator
 
 ```
-**Expected Output:**
-Pods should be in Runnning/Completed status
 
+**Expected Output:**
+
+Pods should be in Running/Completed status
 
 ### 6. Capture Snapshot
 
