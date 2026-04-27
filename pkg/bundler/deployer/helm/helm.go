@@ -498,20 +498,19 @@ func (g *Generator) writeCustomResources(componentName, componentDir string, com
 		return nil, 0, nil
 	}
 
-	// Find the most specific custom resource (longest filename = most criteria)
-	// e.g., resources-ocp-training.yaml is more specific than resources-ocp.yaml
-	// The most specific one already contains merged content from GetMergedCustomResource
-	var mostSpecificPath string
-	var maxLen int
-	for p := range customResources {
-		filename := filepath.Base(p)
-		if len(filename) > maxLen {
-			maxLen = len(filename)
-			mostSpecificPath = p
-		}
+	// CustomResources should contain exactly one entry per component - the merged/resolved resource.
+	// GetMergedCustomResource upstream already handles base + overlay merging.
+	if len(customResources) != 1 {
+		slog.Warn("unexpected number of custom resources for component",
+			"component", componentName, "count", len(customResources))
 	}
 
-	content := customResources[mostSpecificPath]
+	// Use the first (and ideally only) custom resource
+	var content []byte
+	for _, c := range customResources {
+		content = c
+		break
+	}
 
 	// Always write as "resources.yaml" for consistency
 	outputPath, pathErr := deployer.SafeJoin(componentDir, "resources.yaml")
@@ -525,7 +524,7 @@ func (g *Generator) writeCustomResources(componentName, componentDir string, com
 			map[string]any{"component": componentName, "filename": "resources.yaml"})
 	}
 
-	slog.Debug("wrote merged custom resource", "component", componentName, "source", filepath.Base(mostSpecificPath), "output", "resources.yaml")
+	slog.Debug("wrote custom resource", "component", componentName, "output", "resources.yaml")
 
 	return []string{outputPath}, int64(len(content)), nil
 }
@@ -550,6 +549,9 @@ func (g *Generator) writeInstallFiles(componentName, namespace, componentDir str
 
 	for _, installPath := range installPaths {
 		content := installFiles[installPath]
+		if namespace != "" {
+			content = []byte(strings.ReplaceAll(string(content), "{{NAMESPACE}}", namespace))
+		}
 
 		filename := filepath.Base(installPath)
 		outputPath, pathErr := deployer.SafeJoin(componentDir, filename)

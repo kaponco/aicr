@@ -38,7 +38,7 @@ spec:
     serviceMonitor:
       enabled: true
   devicePlugin:
-    enabled: false
+    enabled: true
   toolkit:
     enabled: true
     installDir: /usr/local/nvidia

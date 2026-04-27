@@ -16,25 +16,38 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "==> Uninstalling OLM Components"
 echo ""
 
-# Uninstall in reverse order (dependencies first)
-{{- range .OLMComponents }}
+# Uninstall in reverse order (dependencies last) to avoid breaking dependent operators
+{{- $components := .OLMComponents }}
+{{- $count := len $components }}
+{{- range $i := until $count }}
+{{- $idx := sub (sub $count 1) $i }}
+{{- $comp := index $components $idx }}
 
-echo "==> Uninstalling {{ .Name }}"
+echo "==> Uninstalling {{ $comp.Name }}"
 
-# Delete OLM installation manifests
-echo "    Deleting {{ .Name }}/install.yaml"
-kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/install.yaml" --ignore-not-found
+# Delete custom resources first to allow operator cleanup
+if [ -f "${SCRIPT_DIR}/{{ $comp.Name }}/resources.yaml" ]; then
+  echo "    Deleting custom resources for {{ $comp.Name }}"
+  kubectl delete -f "${SCRIPT_DIR}/{{ $comp.Name }}/resources.yaml" --ignore-not-found --timeout=60s
+fi
 
-# Delete CSV (ClusterServiceVersion)
-echo "    Deleting CSV in namespace {{ .Namespace }}"
-kubectl delete csv --all -n {{ .Namespace }} --ignore-not-found
+# Delete OLM installation manifests (Subscription, OperatorGroup)
+echo "    Deleting {{ $comp.Name }}/install.yaml"
+kubectl delete -f "${SCRIPT_DIR}/{{ $comp.Name }}/install.yaml" --ignore-not-found
 
-# Delete namespace
-echo "    Deleting namespace {{ .Namespace }}"
-kubectl delete namespace {{ .Namespace }} --ignore-not-found
+# Delete CSV (ClusterServiceVersion) for this specific operator
+# Note: This targets CSVs in the component's namespace only
+echo "    Waiting for CSV cleanup in namespace {{ $comp.Namespace }}"
+kubectl wait csv --all --for=delete -n {{ $comp.Namespace }} --timeout=60s 2>/dev/null || true
 
-echo "    ✓ {{ .Name }} uninstalled"
+echo "    ✓ {{ $comp.Name }} uninstalled"
 echo ""
+{{- end }}
+
+# Note: Namespaces are NOT automatically deleted to prevent accidental removal
+# of shared namespaces. Delete manually if needed:
+{{- range .OLMComponents }}
+# kubectl delete namespace {{ .Namespace }} --ignore-not-found
 {{- end }}
 
 echo "==> OLM Operators Uninstallation Complete"

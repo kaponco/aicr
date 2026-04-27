@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
 
@@ -297,7 +297,7 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 			} else {
 				// When using default path, scan directory for all resource files
 				// to support auto-discovery of variant files (e.g., resources-ocp-training.yaml)
-				resourcesDir := filepath.Dir(resourcesFile)
+				resourcesDir := path.Dir(resourcesFile)
 				ref.CustomResources = discoverCustomResources(resourcesDir)
 			}
 		}
@@ -306,6 +306,10 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		ref.Chart = ""
 		ref.Version = ""
 		ref.ValuesFile = ""
+		ref.Tag = ""
+		ref.Path = ""
+		ref.Patches = nil
+		ref.ManifestFiles = nil
 	}
 
 	// NOTE: healthCheck.assertFile content is intentionally NOT loaded here.
@@ -327,7 +331,7 @@ func discoverCustomResources(dirPath string) []string {
 
 	var resources []string
 
-	// Walk the directory to find all YAML files
+	// Walk the directory to find custom resource manifests only
 	_ = provider.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			// Directory doesn't exist or other error - skip
@@ -339,9 +343,11 @@ func discoverCustomResources(dirPath string) []string {
 			return nil
 		}
 
-		// Include only YAML files
+		// Include only custom-resource manifests (files starting with "resources")
+		// This excludes OLM install manifests like install.yaml, Subscription, OperatorGroup
 		name := d.Name()
-		if strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml") {
+		if strings.HasPrefix(name, "resources") &&
+			(strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml")) {
 			resources = append(resources, path)
 		}
 

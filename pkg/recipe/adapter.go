@@ -18,7 +18,7 @@ package recipe
 import (
 	"embed"
 	"fmt"
-	"path/filepath"
+	"path"
 	"strings"
 
 	"github.com/NVIDIA/aicr/pkg/errors"
@@ -101,8 +101,8 @@ func GetMergedCustomResource(path string) ([]byte, error) {
 // Returns empty string if no base path can be derived.
 func deriveBaseResourcePath(overlayPath string) string {
 	// Extract directory and filename
-	dir := filepath.Dir(overlayPath)
-	filename := filepath.Base(overlayPath)
+	dir := path.Dir(overlayPath)
+	filename := path.Base(overlayPath)
 
 	// Check if filename matches pattern: resources-<criteria>.yaml or resources-<criteria>.yml
 	if !strings.HasPrefix(filename, "resources-") {
@@ -110,7 +110,7 @@ func deriveBaseResourcePath(overlayPath string) string {
 	}
 
 	// Remove extension
-	ext := filepath.Ext(filename)
+	ext := path.Ext(filename)
 	nameWithoutExt := strings.TrimSuffix(filename, ext)
 
 	// Split by dashes: resources-ocp-training → [resources, ocp, training]
@@ -124,7 +124,7 @@ func deriveBaseResourcePath(overlayPath string) string {
 	baseParts := parts[:len(parts)-1]
 	baseName := strings.Join(baseParts, "-") + ext
 
-	return filepath.Join(dir, baseName)
+	return path.Join(dir, baseName)
 }
 
 // RecipeInput is an interface that both Recipe and RecipeResult implement.

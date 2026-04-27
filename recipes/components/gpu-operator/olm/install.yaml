@@ -29,6 +29,6 @@ metadata:
   name: nvidia-gpu-operator-group
 spec:
   # NOTE: targetNamespaces must match the namespace this is deployed to.
-  # This is the standard NVIDIA GPU Operator namespace. Edit if using a custom namespace.
+  # The {{NAMESPACE}} placeholder is replaced at bundle generation time.
   targetNamespaces:
-  - gpu-operator
+  - {{NAMESPACE}}
