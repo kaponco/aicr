@@ -24,8 +24,8 @@ echo "    Creating namespace {{ .Namespace }}"
 kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl apply -f -
 
 # Apply OLM installation manifests
-echo "    Applying {{ .Name }}/olm/install.yaml"
-kubectl apply -n {{ .Namespace }} -f "${SCRIPT_DIR}/{{ .Name }}/olm/install.yaml"
+echo "    Applying {{ .Name }}/install.yaml"
+kubectl apply -n {{ .Namespace }} -f "${SCRIPT_DIR}/{{ .Name }}/install.yaml"
 
 echo "    ✓ {{ .Name }} installed"
 echo ""

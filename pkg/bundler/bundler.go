@@ -1066,20 +1066,16 @@ func (b *DefaultBundler) collectComponentInstallFiles(ctx context.Context, recip
 			return nil, errors.Wrap(errors.ErrCodeTimeout, "context cancelled while collecting install files", err)
 		}
 
-		// Only collect install files if specified
-		if len(ref.InstallFiles) == 0 {
+		// Only collect install file if specified
+		if ref.InstallFile == "" {
 			continue
 		}
 
-		componentInstallFiles := make(map[string][]byte, len(ref.InstallFiles))
-		for _, installPath := range ref.InstallFiles {
-			content, err := recipe.GetManifestContent(installPath)
-			if err != nil {
-				return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to load install file %s for component %s", installPath, ref.Name), err)
-			}
-			componentInstallFiles[installPath] = content
+		content, err := recipe.GetManifestContent(ref.InstallFile)
+		if err != nil {
+			return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to load install file %s for component %s", ref.InstallFile, ref.Name), err)
 		}
-		result[ref.Name] = componentInstallFiles
+		result[ref.Name] = map[string][]byte{ref.InstallFile: content}
 	}
 
 	return result, nil

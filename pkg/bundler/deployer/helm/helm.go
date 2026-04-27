@@ -83,7 +83,7 @@ type CustomResourceData struct {
 // InstallFileData contains data for an OLM install file.
 type InstallFileData struct {
 	Filename string // Base filename (e.g., "install.yaml")
-	Path     string // Relative path from component dir (e.g., "olm/install.yaml")
+	Path     string // Relative path from component dir (e.g., "install.yaml")
 }
 
 // compile-time interface check
@@ -304,7 +304,7 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 				for installPath := range instFiles {
 					installFiles = append(installFiles, InstallFileData{
 						Filename: filepath.Base(installPath),
-						Path:     filepath.Join("olm", filepath.Base(installPath)),
+						Path:     filepath.Base(installPath),
 					})
 				}
 				// Sort for deterministic output
@@ -530,22 +530,12 @@ func (g *Generator) writeCustomResources(componentName, componentDir string, com
 	return []string{outputPath}, int64(len(content)), nil
 }
 
-// writeInstallFiles writes OLM install files to the component's olm/ subdirectory.
+// writeInstallFiles writes OLM install files to the component directory.
 // Substitutes {{NAMESPACE}} placeholder with the actual component namespace.
 // Returns paths of written files, total size, and any error.
 func (g *Generator) writeInstallFiles(componentName, namespace, componentDir string, installFiles map[string][]byte) ([]string, int64, error) {
 	if len(installFiles) == 0 {
 		return nil, 0, nil
-	}
-
-	// Create olm/ subdirectory
-	olmDir, err := deployer.SafeJoin(componentDir, "olm")
-	if err != nil {
-		return nil, 0, err
-	}
-	if err := os.MkdirAll(olmDir, 0755); err != nil {
-		return nil, 0, errors.Wrap(errors.ErrCodeInternal,
-			fmt.Sprintf("failed to create olm directory for %s", componentName), err)
 	}
 
 	// Sort install file paths for deterministic output
@@ -562,7 +552,7 @@ func (g *Generator) writeInstallFiles(componentName, namespace, componentDir str
 		content := installFiles[installPath]
 
 		filename := filepath.Base(installPath)
-		outputPath, pathErr := deployer.SafeJoin(olmDir, filename)
+		outputPath, pathErr := deployer.SafeJoin(componentDir, filename)
 		if pathErr != nil {
 			return nil, 0, errors.New(errors.ErrCodeInvalidRequest,
 				fmt.Sprintf("invalid install filename %q in component %s", filename, componentName))

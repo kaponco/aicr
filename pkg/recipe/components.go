@@ -108,10 +108,10 @@ type OLMConfig struct {
 	// DefaultNamespace is the Kubernetes namespace for deploying this component via OLM.
 	DefaultNamespace string `yaml:"defaultNamespace,omitempty"`
 
-	// InstallFiles lists the paths to OLM installation manifest files (relative to data directory).
-	// These files typically contain OperatorGroup, Subscription, and other OLM resources.
-	// Example: ["recipes/components/nfd-operator/olm/install.yaml"]
-	InstallFiles []string `yaml:"installFiles,omitempty"`
+	// InstallFile is the path to the OLM installation manifest file (relative to data directory).
+	// This file typically contains OperatorGroup, Subscription, and other OLM resources.
+	// Example: "components/nfd-operator/olm/install.yaml"
+	InstallFile string `yaml:"installFile,omitempty"`
 
 	// Kinds lists the Kubernetes kinds (custom resources) that this OLM operator manages.
 	// Example: ["ClusterPolicy"] for GPU Operator, ["NodeFeatureDiscovery"] for NFD Operator.

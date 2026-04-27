@@ -637,23 +637,23 @@ func TestDeriveBaseResourcePath(t *testing.T) {
 	}{
 		{
 			name:         "overlay with two-part criteria",
-			overlayPath:  "components/gpu-operator/resources/resources-ocp-training.yaml",
-			expectedBase: "components/gpu-operator/resources/resources-ocp.yaml",
+			overlayPath:  "components/gpu-operator/olm/resources-ocp-training.yaml",
+			expectedBase: "components/gpu-operator/olm/resources-ocp.yaml",
 		},
 		{
 			name:         "overlay with three-part criteria",
-			overlayPath:  "components/gpu-operator/resources/resources-ocp-a100-training.yaml",
-			expectedBase: "components/gpu-operator/resources/resources-ocp-a100.yaml",
+			overlayPath:  "components/gpu-operator/olm/resources-ocp-a100-training.yaml",
+			expectedBase: "components/gpu-operator/olm/resources-ocp-a100.yaml",
 		},
 		{
 			name:         "base file (two parts total) - no base",
-			overlayPath:  "components/gpu-operator/resources/resources-ocp.yaml",
+			overlayPath:  "components/gpu-operator/olm/resources-ocp.yaml",
 			expectedBase: "",
 		},
 		{
 			name:         "yml extension",
-			overlayPath:  "components/nfd-operator/resources/resources-ocp-training.yml",
-			expectedBase: "components/nfd-operator/resources/resources-ocp.yml",
+			overlayPath:  "components/nfd-operator/olm/resources-ocp-training.yml",
+			expectedBase: "components/nfd-operator/olm/resources-ocp.yml",
 		},
 		{
 			name:         "not a resources file",
@@ -662,7 +662,7 @@ func TestDeriveBaseResourcePath(t *testing.T) {
 		},
 		{
 			name:         "single part (just resources.yaml) - no base",
-			overlayPath:  "components/test/resources/resources.yaml",
+			overlayPath:  "components/test/olm/resources.yaml",
 			expectedBase: "",
 		},
 	}
@@ -689,7 +689,7 @@ func TestGetMergedCustomResource(t *testing.T) {
 		{
 			name: "overlay with base - should merge",
 			files: map[string]string{
-				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
+				"components/gpu-operator/olm/resources-ocp.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
   name: cluster-policy
@@ -699,7 +699,7 @@ spec:
     version: "570.86.15"
   dcgm:
     enabled: true`,
-				"components/gpu-operator/resources/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
+				"components/gpu-operator/olm/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
   name: cluster-policy
@@ -709,7 +709,7 @@ spec:
   mig:
     strategy: mixed`,
 			},
-			resourcePath: "components/gpu-operator/resources/resources-ocp-training.yaml",
+			resourcePath: "components/gpu-operator/olm/resources-ocp-training.yaml",
 			expectMerged: true,
 			checkContains: []string{
 				"version: 570.86.15", // From base
@@ -719,7 +719,7 @@ spec:
 		{
 			name: "base file only - return as-is",
 			files: map[string]string{
-				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
+				"components/gpu-operator/olm/resources-ocp.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
   name: cluster-policy
@@ -727,7 +727,7 @@ spec:
   driver:
     enabled: true`,
 			},
-			resourcePath: "components/gpu-operator/resources/resources-ocp.yaml",
+			resourcePath: "components/gpu-operator/olm/resources-ocp.yaml",
 			expectMerged: false,
 			checkContains: []string{
 				"enabled: true",
@@ -736,12 +736,12 @@ spec:
 		{
 			name: "overlay without base - return overlay as-is",
 			files: map[string]string{
-				"components/nfd-operator/resources/resources-ocp-training.yaml": `apiVersion: nfd.openshift.io/v1
+				"components/nfd-operator/olm/resources-ocp-training.yaml": `apiVersion: nfd.openshift.io/v1
 kind: NodeFeatureDiscovery
 metadata:
   name: nfd-instance`,
 			},
-			resourcePath: "components/nfd-operator/resources/resources-ocp-training.yaml",
+			resourcePath: "components/nfd-operator/olm/resources-ocp-training.yaml",
 			expectMerged: false,
 			checkContains: []string{
 				"nfd-instance",
@@ -750,19 +750,19 @@ metadata:
 		{
 			name:         "nonexistent file - error",
 			files:        map[string]string{},
-			resourcePath: "components/nonexistent/resources/resources-ocp.yaml",
+			resourcePath: "components/nonexistent/olm/resources-ocp.yaml",
 			wantErr:      true,
 		},
 		{
 			name: "invalid YAML in base file - error",
 			files: map[string]string{
-				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
+				"components/gpu-operator/olm/resources-ocp.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
   name: cluster-policy
 spec:
   driver: [invalid yaml structure`,
-				"components/gpu-operator/resources/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
+				"components/gpu-operator/olm/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
   name: cluster-policy
@@ -770,27 +770,27 @@ spec:
   mig:
     strategy: mixed`,
 			},
-			resourcePath: "components/gpu-operator/resources/resources-ocp-training.yaml",
+			resourcePath: "components/gpu-operator/olm/resources-ocp-training.yaml",
 			wantErr:      true,
 		},
 		{
 			name: "invalid YAML in overlay file - error",
 			files: map[string]string{
-				"components/gpu-operator/resources/resources-ocp.yaml": `apiVersion: nvidia.com/v1
+				"components/gpu-operator/olm/resources-ocp.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
   name: cluster-policy
 spec:
   driver:
     enabled: true`,
-				"components/gpu-operator/resources/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
+				"components/gpu-operator/olm/resources-ocp-training.yaml": `apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata: [invalid yaml structure
 spec:
   mig:
     strategy: mixed`,
 			},
-			resourcePath: "components/gpu-operator/resources/resources-ocp-training.yaml",
+			resourcePath: "components/gpu-operator/olm/resources-ocp-training.yaml",
 			wantErr:      true,
 		},
 	}

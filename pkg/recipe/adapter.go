@@ -44,7 +44,7 @@ func GetManifestContent(path string) ([]byte, error) {
 // merges it with the overlay, and returns the merged YAML.
 // For base files or files without a base, it returns the content as-is.
 //
-// Path should be relative to data directory (e.g., "components/gpu-operator/resources/resources-ocp-training.yaml").
+// Path should be relative to data directory (e.g., "components/gpu-operator/olm/resources-ocp-training.yaml").
 func GetMergedCustomResource(path string) ([]byte, error) {
 	provider := GetDataProvider()
 
@@ -96,8 +96,8 @@ func GetMergedCustomResource(path string) ([]byte, error) {
 }
 
 // deriveBaseResourcePath attempts to find the base resource file path for an overlay file.
-// For example, "components/gpu-operator/resources/resources-ocp-training.yaml" would return
-// "components/gpu-operator/resources/resources-ocp.yaml".
+// For example, "components/gpu-operator/olm/resources-ocp-training.yaml" would return
+// "components/gpu-operator/olm/resources-ocp.yaml".
 // Returns empty string if no base path can be derived.
 func deriveBaseResourcePath(overlayPath string) string {
 	// Extract directory and filename

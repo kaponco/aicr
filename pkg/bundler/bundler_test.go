@@ -1355,7 +1355,7 @@ func TestCollectComponentCustomResources(t *testing.T) {
 		recipeResult := &recipe.RecipeResult{
 			ComponentRefs: []recipe.ComponentRef{
 				{
-					Name:            "nfd-operator",
+					Name:            "nfd",
 					Type:            recipe.ComponentTypeOLM,
 					CustomResources: []string{},
 				},
@@ -1396,7 +1396,7 @@ func TestCollectComponentCustomResources(t *testing.T) {
 		recipeResult := &recipe.RecipeResult{
 			ComponentRefs: []recipe.ComponentRef{
 				{
-					Name:            "nfd-operator",
+					Name:            "nfd",
 					Type:            recipe.ComponentTypeOLM,
 					CustomResources: []string{"nonexistent/cr.yaml"},
 				},
@@ -1416,9 +1416,9 @@ func TestCollectComponentCustomResources(t *testing.T) {
 		recipeResult := &recipe.RecipeResult{
 			ComponentRefs: []recipe.ComponentRef{
 				{
-					Name:            "nfd-operator",
+					Name:            "nfd",
 					Type:            recipe.ComponentTypeOLM,
-					CustomResources: []string{"components/nfd-operator/resources/resources-ocp.yaml"},
+					CustomResources: []string{"components/nfd/olm/resources-ocp.yaml"},
 				},
 			},
 		}
@@ -1430,11 +1430,11 @@ func TestCollectComponentCustomResources(t *testing.T) {
 		if len(contents) != 1 {
 			t.Errorf("expected 1 component with custom resources, got %d", len(contents))
 		}
-		if _, ok := contents["nfd-operator"]; !ok {
-			t.Error("expected nfd-operator in results")
+		if _, ok := contents["nfd"]; !ok {
+			t.Error("expected nfd in results")
 		}
-		if len(contents["nfd-operator"]) != 1 {
-			t.Errorf("expected 1 custom resource for nfd-operator, got %d", len(contents["nfd-operator"]))
+		if len(contents["nfd"]) != 1 {
+			t.Errorf("expected 1 custom resource for nfd, got %d", len(contents["nfd"]))
 		}
 	})
 
@@ -1442,14 +1442,14 @@ func TestCollectComponentCustomResources(t *testing.T) {
 		recipeResult := &recipe.RecipeResult{
 			ComponentRefs: []recipe.ComponentRef{
 				{
-					Name:            "nfd-operator",
+					Name:            "nfd",
 					Type:            recipe.ComponentTypeOLM,
-					CustomResources: []string{"components/nfd-operator/resources/resources-ocp.yaml"},
+					CustomResources: []string{"components/nfd/olm/resources-ocp.yaml"},
 				},
 				{
 					Name:            "gpu-operator",
 					Type:            recipe.ComponentTypeOLM,
-					CustomResources: []string{"components/gpu-operator/resources/resources-ocp.yaml"},
+					CustomResources: []string{"components/gpu-operator/olm/resources-ocp.yaml"},
 				},
 			},
 		}
@@ -1461,8 +1461,8 @@ func TestCollectComponentCustomResources(t *testing.T) {
 		if len(contents) != 2 {
 			t.Errorf("expected 2 components with custom resources, got %d", len(contents))
 		}
-		if _, ok := contents["nfd-operator"]; !ok {
-			t.Error("expected nfd-operator in results")
+		if _, ok := contents["nfd"]; !ok {
+			t.Error("expected nfd in results")
 		}
 		if _, ok := contents["gpu-operator"]; !ok {
 			t.Error("expected gpu-operator in results")
@@ -1476,9 +1476,9 @@ func TestCollectComponentCustomResources(t *testing.T) {
 		recipeResult := &recipe.RecipeResult{
 			ComponentRefs: []recipe.ComponentRef{
 				{
-					Name:            "nfd-operator",
+					Name:            "nfd",
 					Type:            recipe.ComponentTypeOLM,
-					CustomResources: []string{"components/nfd-operator/cr-node-feature-discovery.yaml"},
+					CustomResources: []string{"components/nfd/cr-node-feature-discovery.yaml"},
 				},
 			},
 		}

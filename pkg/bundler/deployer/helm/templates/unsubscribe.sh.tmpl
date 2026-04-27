@@ -22,8 +22,8 @@ echo ""
 echo "==> Uninstalling {{ .Name }}"
 
 # Delete OLM installation manifests
-echo "    Deleting {{ .Name }}/olm/install.yaml"
-kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/olm/install.yaml" --ignore-not-found
+echo "    Deleting {{ .Name }}/install.yaml"
+kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/install.yaml" --ignore-not-found
 
 # Delete CSV (ClusterServiceVersion)
 echo "    Deleting CSV in namespace {{ .Namespace }}"

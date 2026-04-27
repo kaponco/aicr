@@ -30,6 +30,6 @@ spec:
   componentRefs:
     - name: gpu-operator
       type: OLM
-      resourcesFile: components/gpu-operator/resources/resources-ocp-training.yaml
+      resourcesFile: components/gpu-operator/olm/resources-ocp-training.yaml
 
 # Validation configuration for OCP training deployments - currently no validation for ocp training

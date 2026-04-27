@@ -31,7 +31,7 @@
 #     defaultTag:        Git tag, branch, or commit
 #   olm:               Default OLM (Operator Lifecycle Manager) settings (for OLM components)
 #     defaultNamespace:  Default Kubernetes namespace for the operator
-#     installFiles:      Paths to OLM installation manifests (Subscription, OperatorGroup, etc.)
+#     installFile:       Path to OLM installation manifest (Subscription, OperatorGroup, etc.)
 #     kinds:             Kubernetes kinds (CRDs) this operator manages (e.g., ["ClusterPolicy"])
 #   testTier:          Optional override for component test tier detection
 #                      (scheduling, deploy, or gpu-aware). Used by tools/component-test/.
@@ -50,20 +50,28 @@ components:
     displayName: Node Feature Discovery
     valueOverrideKeys:
       - nfd
+      - nfdoperator
     healthCheck:
       assertFile: checks/nfd/health-check.yaml
     helm:
       defaultRepository: https://kubernetes-sigs.github.io/node-feature-discovery/charts
       defaultChart: node-feature-discovery
       defaultNamespace: node-feature-discovery
+    olm:
+      defaultNamespace: openshift-nfd
+      installFile: components/nfd/olm/install.yaml
+      kinds:
+        - NodeFeatureDiscovery
     nodeScheduling:
       system:
         nodeSelectorPaths:
           - master.nodeSelector
           - gc.nodeSelector
+          - operator.nodeSelector  # OLM-specific
         tolerationPaths:
           - master.tolerations
           - gc.tolerations
+          - operator.tolerations  # OLM-specific
           # Worker also inherits system tolerations — the DaemonSet must
           # run on tainted system nodes (not just GPU nodes) to publish
           # hardware features cluster-wide.
@@ -71,36 +79,11 @@ components:
       accelerated:
         # Worker intentionally excluded from accelerated nodeSelector —
         # NFD workers must run on ALL nodes to detect hardware features.
+        nodeSelectorPaths:
+          - daemonsets.nodeSelector  # OLM-specific
         tolerationPaths:
           - worker.tolerations
-
-  - name: nfd-operator
-    displayName: nfd-operator
-    valueOverrideKeys:
-      - nfdoperator
-    healthCheck:
-      assertFile: checks/nfd-operator/health-check.yaml
-    olm:
-      defaultNamespace: openshift-nfd
-      installFiles:
-        - components/nfd-operator/olm/install.yaml
-      kinds:
-        - NodeFeatureDiscovery
-    nodeScheduling:
-      system:
-        nodeSelectorPaths:
-          - operator.nodeSelector
-          - gc.nodeSelector
-          - master.nodeSelector
-        tolerationPaths:
-          - operator.tolerations
-          - gc.tolerations
-          - master.tolerations
-      accelerated:
-        nodeSelectorPaths:
-          - daemonsets.nodeSelector
-        tolerationPaths:
-          - daemonsets.tolerations
+          - daemonsets.tolerations  # OLM-specific
 
   - name: gpu-operator
     displayName: gpu-operator
@@ -114,8 +97,7 @@ components:
       defaultNamespace: gpu-operator
     olm:
       defaultNamespace: gpu-operator
-      installFiles:
-        - components/gpu-operator/olm/install.yaml
+      installFile: components/gpu-operator/olm/install.yaml
       kinds:
         - ClusterPolicy
     nodeScheduling:
@@ -142,8 +124,7 @@ components:
       defaultNamespace: nvidia-network-operator
     olm:
       defaultNamespace: nvidia-network-operator
-      installFiles:
-        - components/network-operator/olm/install.yaml
+      installFile: components/network-operator/olm/install.yaml
       kinds:
         - NicClusterPolicy
     nodeScheduling:

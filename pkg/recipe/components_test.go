@@ -864,7 +864,7 @@ components:
 }
 
 func TestOLMConfig_Parsing(t *testing.T) {
-	// Test that OLMConfig can be parsed correctly from YAML including installFiles field
+	// Test that OLMConfig can be parsed correctly from YAML including installFile field
 	yamlData := `
 apiVersion: aicr.nvidia.com/v1alpha1
 kind: ComponentRegistry
@@ -875,9 +875,7 @@ components:
       - testoperator
     olm:
       defaultNamespace: test-namespace
-      installFiles:
-        - recipes/components/test-operator/olm/install.yaml
-        - recipes/components/test-operator/olm/subscription.yaml
+      installFile: recipes/components/test-operator/olm/install.yaml
       kinds:
         - TestResource
         - TestConfig
@@ -903,21 +901,9 @@ components:
 		t.Errorf("OLM.DefaultNamespace = %q, want %q", comp.OLM.DefaultNamespace, "test-namespace")
 	}
 
-	expectedInstallFiles := []string{
-		"recipes/components/test-operator/olm/install.yaml",
-		"recipes/components/test-operator/olm/subscription.yaml",
-	}
-	if len(comp.OLM.InstallFiles) != len(expectedInstallFiles) {
-		t.Errorf("OLM.InstallFiles length = %d, want %d", len(comp.OLM.InstallFiles), len(expectedInstallFiles))
-	}
-	for i, expected := range expectedInstallFiles {
-		if i >= len(comp.OLM.InstallFiles) {
-			t.Errorf("OLM.InstallFiles[%d] missing, want %q", i, expected)
-			continue
-		}
-		if comp.OLM.InstallFiles[i] != expected {
-			t.Errorf("OLM.InstallFiles[%d] = %q, want %q", i, comp.OLM.InstallFiles[i], expected)
-		}
+	expectedInstallFile := "recipes/components/test-operator/olm/install.yaml"
+	if comp.OLM.InstallFile != expectedInstallFile {
+		t.Errorf("OLM.InstallFile = %q, want %q", comp.OLM.InstallFile, expectedInstallFile)
 	}
 
 	expectedKinds := []string{"TestResource", "TestConfig"}
@@ -947,30 +933,35 @@ func TestOLMConfig_RealRegistry(t *testing.T) {
 		t.Fatalf("failed to load component registry: %v", err)
 	}
 
-	// Test nfd-operator has installFiles configured
-	nfdOp := registry.Get("nfd-operator")
-	if nfdOp == nil {
-		t.Fatal("nfd-operator not found in registry")
+	// Test nfd has OLM configuration (for OpenShift deployments)
+	nfd := registry.Get("nfd")
+	if nfd == nil {
+		t.Fatal("nfd not found in registry")
 	}
 
-	if nfdOp.GetType() != ComponentTypeOLM {
-		t.Errorf("nfd-operator type = %v, want %v", nfdOp.GetType(), ComponentTypeOLM)
+	// nfd supports both Helm and OLM deployment
+	if nfd.Helm.DefaultRepository == "" {
+		t.Error("nfd should have Helm configuration")
 	}
 
-	if nfdOp.OLM.DefaultNamespace != "openshift-nfd" {
-		t.Errorf("nfd-operator OLM.DefaultNamespace = %q, want %q", nfdOp.OLM.DefaultNamespace, "openshift-nfd")
+	if nfd.OLM.DefaultNamespace == "" {
+		t.Error("nfd should have OLM configuration")
 	}
 
-	if len(nfdOp.OLM.InstallFiles) == 0 {
-		t.Error("nfd-operator should have installFiles configured")
+	if nfd.OLM.DefaultNamespace != "openshift-nfd" {
+		t.Errorf("nfd OLM.DefaultNamespace = %q, want %q", nfd.OLM.DefaultNamespace, "openshift-nfd")
 	}
 
-	if len(nfdOp.OLM.Kinds) == 0 {
-		t.Error("nfd-operator should have kinds configured")
+	if nfd.OLM.InstallFile == "" {
+		t.Error("nfd should have installFile configured for OLM")
 	}
 
-	if !slices.Contains(nfdOp.OLM.Kinds, "NodeFeatureDiscovery") {
-		t.Error("nfd-operator should have 'NodeFeatureDiscovery' in kinds")
+	if len(nfd.OLM.Kinds) == 0 {
+		t.Error("nfd should have kinds configured for OLM")
+	}
+
+	if !slices.Contains(nfd.OLM.Kinds, "NodeFeatureDiscovery") {
+		t.Error("nfd should have 'NodeFeatureDiscovery' in kinds")
 	}
 
 	// Test gpu-operator has OLM config with kinds

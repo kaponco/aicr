@@ -112,13 +112,13 @@ type ComponentRef struct {
 	// Package is the OLM package name (for OLM components, e.g., "gpu-operator-certified").
 	Package string `json:"package,omitempty" yaml:"package,omitempty"`
 
-	// InstallFiles lists OLM installation manifest files to include (for OLM components).
-	// These files typically contain OperatorGroup, Subscription, and other OLM resources.
-	// Paths are relative to the data directory.
-	InstallFiles []string `json:"installFiles,omitempty" yaml:"installFiles,omitempty"`
+	// InstallFile is the path to the OLM installation manifest file (for OLM components).
+	// This file typically contains OperatorGroup, Subscription, and other OLM resources.
+	// Path is relative to the data directory.
+	InstallFile string `json:"installFile,omitempty" yaml:"installFile,omitempty"`
 
 	// ResourcesFile is the path to the custom resource file (for OLM components).
-	// Path is relative to the data directory (e.g., "components/gpu-operator/resources/resources.yaml").
+	// Path is relative to the data directory (e.g., "components/gpu-operator/olm/resources.yaml").
 	ResourcesFile string `json:"resourcesFile,omitempty" yaml:"resourcesFile,omitempty"`
 
 	// Kinds lists the Kubernetes kinds (custom resources) that this OLM operator manages.
@@ -266,8 +266,8 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		if ref.Namespace == "" && config.OLM.DefaultNamespace != "" {
 			ref.Namespace = config.OLM.DefaultNamespace
 		}
-		if len(ref.InstallFiles) == 0 && len(config.OLM.InstallFiles) > 0 {
-			ref.InstallFiles = config.OLM.InstallFiles
+		if ref.InstallFile == "" && config.OLM.InstallFile != "" {
+			ref.InstallFile = config.OLM.InstallFile
 		}
 		if len(ref.Kinds) == 0 && len(config.OLM.Kinds) > 0 {
 			ref.Kinds = config.OLM.Kinds
@@ -282,7 +282,7 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 				resourcesFile = ref.ResourcesFile
 			} else {
 				// Fallback to default resources.yaml path
-				resourcesFile = fmt.Sprintf("components/%s/resources/resources.yaml", ref.Name)
+				resourcesFile = fmt.Sprintf("components/%s/olm/resources.yaml", ref.Name)
 				ref.ResourcesFile = resourcesFile
 			}
 
@@ -702,17 +702,9 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 		}
 	}
 
-	// InstallFiles: additive merge (base + overlay, deduplicated)
-	if len(overlay.InstallFiles) > 0 {
-		seen := make(map[string]bool)
-		for _, f := range result.InstallFiles {
-			seen[f] = true
-		}
-		for _, f := range overlay.InstallFiles {
-			if !seen[f] {
-				result.InstallFiles = append(result.InstallFiles, f)
-			}
-		}
+	// InstallFile: overlay takes precedence if set (for OLM)
+	if overlay.InstallFile != "" {
+		result.InstallFile = overlay.InstallFile
 	}
 
 	// ResourcesFile: overlay takes precedence if set (for OLM)

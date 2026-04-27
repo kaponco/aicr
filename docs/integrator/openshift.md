@@ -4,11 +4,11 @@ Deploy NVIDIA GPU and networking components on Red Hat OpenShift using the Opera
 
 ## Overview
 
-The **OpenShift deployment** deviates from others in this repository in two fundamental ways:
+The **OpenShift deployment** process follows a two-stage lifecycle:
 
-1. **Operator-Based Installation:** Components are managed via Operator Lifecycle Manager (OLM) subscriptions instead of standard Helm charts.
+1. **Operator-Based Installation:** Components setup is managed via Operator Lifecycle Manager (OLM) instead of standard Helm charts.
 
-2. **CR-Driven Configuration:** Post-installation, the operator’s behavior is defined by deploying specific Custom Resources (CRs).  
+2. **CR-Driven Configuration:** Post-installation, the operator’s behavior is defined by applying targeted Custom Resources (CRs).  
 
 
 ### OLM Architecture:
@@ -23,7 +23,9 @@ The Operator Lifecycle Manager provides a declarative approach to managing opera
 
 **Subscription vs. CR Deployment**:
 
- The Subscription and the Custom Resource (CR) follow independent lifecycles: the Subscription bootstraps the operator environment, while the CR acts as the ongoing trigger for the operator to provision and manage the workload
+The Subscription and the Custom Resource (CR) follow independent lifecycles: the Subscription bootstraps the operator environment
+while the CR acts as the ongoing trigger for the operator to provision and manage the workload.
+This distinction creates two separate operational flows — one for the operator instalation (i.e. subscription) and one for the workload deployment.
 
 **OpenShift-Specific Constraints:**
 
@@ -37,9 +39,10 @@ The Operator Lifecycle Manager provides a declarative approach to managing opera
 1. Generate recipe → AICR detects OpenShift and selects OLM-based components
 2. Bundle generation → Creates OLM Subscription manifests and CR templates
 3. Apply subscriptions → Operators install via OLM
-4. Wait for CSV ready → Operator controllers become active
-5. Apply Custom Resources → Operators reconcile GPU/network components
-6. Validate deployment → Verify operator status and component readiness
+4. Create a snapshot → Records cluster's status
+5. Wait for CSV ready → Operator controllers become active
+6. Apply Custom Resources → Operators reconcile GPU/network components
+7. Validate deployment → Verify operator status and component readiness
 
 ## Complete Deployment Workflow
 
@@ -79,7 +82,7 @@ The recipe will include OpenShift-specific component references with OLM deploym
     namespace: gpu-operator
     type: OLM
     dependencyRefs:
-      - nfd-operator
+      - nfd
     manifestFiles:
       - components/gpu-operator/manifests/dcgm-exporter.yaml
     installFiles:
@@ -126,13 +129,11 @@ ocp-bundle/
 ├── undeploy.sh                 # Cleanup script
 ├── unsubscribe.sh              # OLM cleanup script
 ├── gpu-operator/
-│   ├── olm/
-│   │   └── install.yaml       # Subscription + OperatorGroup
+│   ├── install.yaml       # Subscription + OperatorGroup
 │   ├── resources.yaml         # ClusterPolicy CR
 │   └── README.md
 └── network-operator/
-    ├── olm/
-    │   └── install.yaml       # Subscription + OperatorGroup
+    ├── install.yaml       # Subscription + OperatorGroup
     ├── resources.yaml         # NicClusterPolicy CR
     └── README.md
 ```
@@ -185,7 +186,7 @@ Once operators are ready, deploy the Custom Resources that configure their behav
 Running pre-flight checks...
 Pre-flight checks passed.
 Deploying Cloud Native Stack components...
-Installing nfd-operator (openshift-nfd) via OLM custom resources...
+Installing nfd (openshift-nfd) via OLM custom resources...
 ...
 Deployment complete.
 ...

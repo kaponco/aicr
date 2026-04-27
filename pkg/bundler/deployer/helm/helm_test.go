@@ -2395,8 +2395,8 @@ func TestWriteCustomResources(t *testing.T) {
 			componentName: "gpu-operator",
 			componentCustomResources: map[string]map[string][]byte{
 				"gpu-operator": {
-					"components/gpu-operator/resources/resources-ocp.yaml":          []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\n"),
-					"components/gpu-operator/resources/resources-ocp-training.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\nspec:\n  mig:\n    strategy: mixed\n"),
+					"components/gpu-operator/olm/resources-ocp.yaml":          []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\n"),
+					"components/gpu-operator/olm/resources-ocp-training.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\nspec:\n  mig:\n    strategy: mixed\n"),
 				},
 			},
 			wantFiles: 1, // Only writes the most specific (longest filename) as resources.yaml
