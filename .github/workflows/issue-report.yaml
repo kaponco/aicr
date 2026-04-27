@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  organization-projects: read
 
 concurrency:
   group: ${{ github.workflow }}
@@ -38,7 +39,6 @@ jobs:
     permissions:
       contents: read
       issues: read
-      organization-projects: read
     steps:
 
       - name: Collect issue metrics
