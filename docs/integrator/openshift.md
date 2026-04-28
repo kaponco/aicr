@@ -63,7 +63,7 @@ aicr recipe \
 
 **Expected Output:**
 
-```
+```text
 [cli] building recipe from criteria: criteria=criteria(service=ocp, accelerator=l40, intent=inference, os=rhel)
 [cli] recipe generation completed: output=recipe.yaml 
 ```
@@ -107,7 +107,7 @@ aicr bundle \
 
 **Expected Output:**
 
-```
+```text
 [cli] generating bundle: deployer=helm type=Helm per-component bundle recipe=/tmp/aicr-demo/recipe.yaml output=/tmp/aicr-demo/bundles oci=false
 [cli] bundle generated: type=Helm per-component bundle files=16 size_bytes=68044 duration_sec=0.005469625 output_dir=/tmp/aicr-demo/bundles
 
@@ -122,7 +122,7 @@ Files generated: 16
 tree ocp-bundle
 ```
 
-```
+```text
 ocp-bundle/
 ├── subscribe.sh                # Step 1: Install OLM subscriptions
 ├── deploy.sh                   # Step 2: Deploy custom resources
@@ -149,7 +149,7 @@ cd ocp-bundle
 
 **Expected Output:**
 
-```
+```text
 ==> Installing OLM Components
 ...
 ```
@@ -167,7 +167,7 @@ kubectl wait --for=jsonpath='{.status.phase}'=Succeeded \
 
 **Expected Output:**
 
-```
+```text
 clusterserviceversion.operators.coreos.com/gpu-operator-certified.v25.10.1 condition met
 ```
 
@@ -182,7 +182,7 @@ Once operators are ready, deploy the Custom Resources that configure their behav
 
 **Expected Output:**
 
-```
+```text
 Running pre-flight checks...
 Pre-flight checks passed.
 Deploying Cloud Native Stack components...
@@ -214,7 +214,7 @@ aicr snapshot --output snapshot.yaml
 
 **Expected Output:**
 
-```
+```text
 [cli] deploying agent: namespace=default
 [cli] agent deployed successfully
 [cli] waiting for Job completion: job=aicr timeout=5m0s
@@ -255,7 +255,7 @@ aicr validate \
 
 **Expected Output:**
 
-```
+```text
 [cli] loading recipe: uri=recipe.yaml
 [cli] loading snapshot: uri=snapshot.yaml
 [cli] running validation: phases=[deployment]
