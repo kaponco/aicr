@@ -18,9 +18,7 @@ package recipe
 import (
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"log/slog"
-	"path"
 	"sort"
 	"strings"
 
@@ -272,12 +270,11 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		if len(ref.Kinds) == 0 && len(config.OLM.Kinds) > 0 {
 			ref.Kinds = config.OLM.Kinds
 		}
-		// Auto-discover custom resources from resources file or directory
+		// Set custom resources from resourcesFile (explicit or default)
 		if len(ref.CustomResources) == 0 {
 			var resourcesFile string
-			explicitlySet := ref.ResourcesFile != ""
 
-			if explicitlySet {
+			if ref.ResourcesFile != "" {
 				// Use resourcesFile from ref (set from overlay)
 				resourcesFile = ref.ResourcesFile
 			} else {
@@ -286,19 +283,12 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 				ref.ResourcesFile = resourcesFile
 			}
 
-			if explicitlySet {
-				// When resourcesFile is explicitly set from overlay, use only that specific file
-				provider := GetDataProvider()
-				if provider != nil {
-					if _, err := provider.ReadFile(resourcesFile); err == nil {
-						ref.CustomResources = []string{resourcesFile}
-					}
+			// Always use single file (matches Helm valuesFile behavior)
+			provider := GetDataProvider()
+			if provider != nil {
+				if _, err := provider.ReadFile(resourcesFile); err == nil {
+					ref.CustomResources = []string{resourcesFile}
 				}
-			} else {
-				// When using default path, scan directory for all resource files
-				// to support auto-discovery of variant files (e.g., resources-ocp-training.yaml)
-				resourcesDir := path.Dir(resourcesFile)
-				ref.CustomResources = discoverCustomResources(resourcesDir)
 			}
 		}
 		// Clear Helm/Kustomize-specific fields that don't apply to OLM components
@@ -323,41 +313,6 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 // discoverCustomResources scans a directory for custom resource files.
 // Returns paths to all .yaml and .yml files found in the directory.
 // Returns empty slice if directory doesn't exist or is empty.
-func discoverCustomResources(dirPath string) []string {
-	provider := GetDataProvider()
-	if provider == nil {
-		return nil
-	}
-
-	var resources []string
-
-	// Walk the directory to find custom resource manifests only
-	_ = provider.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			// Directory doesn't exist or other error - skip
-			return nil
-		}
-
-		// Skip directories
-		if d.IsDir() {
-			return nil
-		}
-
-		// Include only custom-resource manifests (files starting with "resources")
-		// This excludes OLM install manifests like install.yaml, Subscription, OperatorGroup
-		name := d.Name()
-		if strings.HasPrefix(name, "resources") &&
-			(strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".yml")) {
-			resources = append(resources, path)
-		}
-
-		return nil
-	})
-
-	sort.Strings(resources) // Deterministic order
-	return resources
-}
-
 // RecipeMetadataSpec contains the specification for a recipe.
 type RecipeMetadataSpec struct {
 	// Base is the name of the parent recipe to inherit from.

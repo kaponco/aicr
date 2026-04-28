@@ -37,7 +37,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"testing/fstest"
 )
 
 func TestRecipeMetadataSpecValidateDependencies(t *testing.T) {
@@ -1314,130 +1313,6 @@ func TestComponentRefApplyRegistryDefaults_HealthCheckAsserts(t *testing.T) {
 			t.Errorf("HealthCheckAsserts = %q, want %q (should preserve existing)", ref.HealthCheckAsserts, "existing-content")
 		}
 	})
-}
-
-func TestDiscoverCustomResources(t *testing.T) {
-	tests := []struct {
-		name     string
-		dirPath  string
-		files    map[string]string
-		expected []string
-	}{
-		{
-			name:    "directory with multiple yaml files - sorted",
-			dirPath: "components/gpu-operator/olm",
-			files: map[string]string{
-				"components/gpu-operator/olm/resources-ocp.yaml":          "kind: ClusterPolicy",
-				"components/gpu-operator/olm/resources-ocp-training.yaml": "kind: ClusterPolicy",
-				"components/gpu-operator/olm/install.yaml":                "kind: Subscription",
-			},
-			expected: []string{
-				"components/gpu-operator/olm/resources-ocp-training.yaml",
-				"components/gpu-operator/olm/resources-ocp.yaml",
-			},
-		},
-		{
-			name:    "directory with yml extension",
-			dirPath: "components/nfd-operator/olm",
-			files: map[string]string{
-				"components/nfd-operator/olm/install.yml":   "kind: Subscription",
-				"components/nfd-operator/olm/resources.yml": "kind: NodeFeatureDiscovery",
-			},
-			expected: []string{
-				"components/nfd-operator/olm/resources.yml",
-			},
-		},
-		{
-			name:    "directory with mixed files - only resources*.yaml/yml included",
-			dirPath: "components/test/olm",
-			files: map[string]string{
-				"components/test/olm/resources-base.yaml": "kind: Test",
-				"components/test/olm/install.yaml":        "kind: Subscription",
-				"components/test/olm/readme.md":           "# README",
-				"components/test/olm/script.sh":           "#!/bin/bash",
-				"components/test/olm/config.json":         "{}",
-				"components/test/olm/data.txt":            "data",
-			},
-			expected: []string{
-				"components/test/olm/resources-base.yaml",
-			},
-		},
-		{
-			name:    "directory with both yaml and yml extensions - only resources* files",
-			dirPath: "components/mixed/olm",
-			files: map[string]string{
-				"components/mixed/olm/resources-a.yaml": "kind: A",
-				"components/mixed/olm/resources-b.yml":  "kind: B",
-				"components/mixed/olm/install.yaml":     "kind: Subscription",
-			},
-			expected: []string{
-				"components/mixed/olm/resources-a.yaml",
-				"components/mixed/olm/resources-b.yml",
-			},
-		},
-		{
-			name:    "empty directory",
-			dirPath: "components/empty/olm",
-			files: map[string]string{
-				"components/empty/olm/.gitkeep": "", // Create directory entry
-			},
-			expected: nil,
-		},
-		{
-			name:     "nonexistent directory",
-			dirPath:  "components/nonexistent/olm",
-			files:    map[string]string{},
-			expected: nil,
-		},
-		{
-			name:    "directory with subdirectories - includes nested resources files",
-			dirPath: "components/nested/olm",
-			files: map[string]string{
-				"components/nested/olm/resources-root.yaml":          "kind: Root",
-				"components/nested/olm/install.yaml":                 "kind: Subscription",
-				"components/nested/olm/subdir/resources-nested.yaml": "kind: Nested",
-			},
-			expected: []string{
-				"components/nested/olm/resources-root.yaml",
-				"components/nested/olm/subdir/resources-nested.yaml",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create test filesystem
-			fs := make(fstest.MapFS)
-			for path, content := range tt.files {
-				fs[path] = &fstest.MapFile{
-					Data: []byte(content),
-				}
-			}
-
-			// Set up test data provider
-			old := GetDataProvider()
-			SetDataProvider(&testFSProvider{fs: fs})
-			defer SetDataProvider(old)
-
-			// Test discoverCustomResources
-			result := discoverCustomResources(tt.dirPath)
-
-			// Check result length
-			if len(result) != len(tt.expected) {
-				t.Errorf("discoverCustomResources() returned %d files, want %d", len(result), len(tt.expected))
-				t.Logf("Got:  %v", result)
-				t.Logf("Want: %v", tt.expected)
-				return
-			}
-
-			// Results should be sorted and match expected
-			for i, path := range result {
-				if path != tt.expected[i] {
-					t.Errorf("discoverCustomResources()[%d] = %q, want %q", i, path, tt.expected[i])
-				}
-			}
-		})
-	}
 }
 
 func TestApplyComponentDefaults_OLM(t *testing.T) {

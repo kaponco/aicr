@@ -291,6 +291,17 @@ func (b *DefaultBundler) buildDeployer(ctx context.Context, recipeResult *recipe
 		"dynamic_components", len(dynamicValues),
 	)
 
+	// Validate OLM components are only used with Helm deployer
+	if b.Config.Deployer() != config.DeployerHelm {
+		for _, ref := range recipeResult.ComponentRefs {
+			if ref.Type == recipe.ComponentTypeOLM {
+				return nil, errors.New(errors.ErrCodeInvalidRequest,
+					fmt.Sprintf("OLM components (like %s) are only supported with --deployer helm; "+
+						"current deployer is %s", ref.Name, b.Config.Deployer()))
+			}
+		}
+	}
+
 	switch b.Config.Deployer() {
 	case config.DeployerArgoCDHelm:
 		return &argocdhelm.Generator{

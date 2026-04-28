@@ -2391,18 +2391,18 @@ func TestWriteCustomResources(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:          "multiple custom resources - writes first entry and warns",
+			name:          "multiple custom resources - returns error",
 			componentName: "gpu-operator",
 			componentCustomResources: map[string]map[string][]byte{
 				"gpu-operator": {
-					// Multiple entries is unexpected (upstream should have merged),
-					// but we handle it gracefully by writing one and logging a warning
+					// Multiple entries should never occur with explicit resourcesFile behavior.
+					// Recipe resolution guarantees exactly one resourcesFile per component.
 					"components/gpu-operator/olm/resources-ocp.yaml":          []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\n"),
 					"components/gpu-operator/olm/resources-ocp-training.yaml": []byte("apiVersion: nvidia.com/v1\nkind: ClusterPolicy\nspec:\n  mig:\n    strategy: mixed\n"),
 				},
 			},
-			wantFiles: 1, // Writes one file (whichever is first in map iteration) and logs warning
-			wantErr:   false,
+			wantFiles: 0, // Error before writing any files
+			wantErr:   true,
 		},
 	}
 

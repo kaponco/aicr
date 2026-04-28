@@ -86,6 +86,12 @@ type InstallFileData struct {
 	Path     string // Relative path from component dir (e.g., "install.yaml")
 }
 
+// OLMComponentData contains data for an OLM component in script templates.
+type OLMComponentData struct {
+	Name      string
+	Namespace string
+}
+
 // compile-time interface check
 var _ deployer.Deployer = (*Generator)(nil)
 
@@ -238,6 +244,50 @@ func (g *Generator) Generate(ctx context.Context, outputDir string) (*deployer.O
 	return output, nil
 }
 
+// getService extracts the service type from the recipe criteria.
+// Returns empty string if criteria or service is not set.
+func (g *Generator) getService() string {
+	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
+		return string(g.RecipeResult.Criteria.Service)
+	}
+	return ""
+}
+
+// generateExecutableScript generates a script file from a template and makes it executable.
+// This helper consolidates the common pattern of template generation + chmod 0755.
+func (g *Generator) generateExecutableScript(ctx context.Context, template string, data any, outputDir, filename, scriptName string) (string, int64, error) {
+	if err := ctx.Err(); err != nil {
+		return "", 0, err
+	}
+
+	path, size, err := deployer.GenerateFromTemplate(template, data, outputDir, filename)
+	if err != nil {
+		return "", 0, err
+	}
+
+	if err := os.Chmod(path, 0755); err != nil {
+		return "", 0, errors.Wrap(errors.ErrCodeInternal,
+			fmt.Sprintf("failed to set %s permissions", scriptName), err)
+	}
+
+	return path, size, nil
+}
+
+// collectOLMComponents extracts OLM component data from the component list.
+// Returns only components that have install files.
+func collectOLMComponents(components []ComponentData) []OLMComponentData {
+	olmComponents := []OLMComponentData{}
+	for _, comp := range components {
+		if comp.HasInstallFiles {
+			olmComponents = append(olmComponents, OLMComponentData{
+				Name:      comp.Name,
+				Namespace: comp.Namespace,
+			})
+		}
+	}
+	return olmComponents
+}
+
 // buildComponentDataList builds a sorted list of ComponentData from the recipe.
 // It validates that all component names are safe for use as directory names.
 func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
@@ -247,10 +297,7 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 	}
 
 	// Extract service from criteria
-	var service string
-	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
-		service = string(g.RecipeResult.Criteria.Service)
-	}
+	service := g.getService()
 
 	// Sort by deployment order
 	sorted := deployer.SortComponentRefsByDeploymentOrder(
@@ -490,22 +537,23 @@ func (g *Generator) generateComponentDirectories(ctx context.Context, components
 }
 
 // writeCustomResources writes a single merged custom resource file for an OLM component.
-// If multiple custom resources are provided (e.g., base + overlay), it uses the most specific
-// one (last after sorting) which already contains merged content, and writes it as "resources.yaml".
+// The recipe resolution ensures exactly one resourcesFile per component (matching Helm's
+// valuesFile behavior), which is already merged with its base overlay content upstream.
+// User overrides from --set, node selectors, and tolerations are then applied before writing.
 func (g *Generator) writeCustomResources(componentName, componentDir string, componentCustomResources map[string]map[string][]byte) ([]string, int64, error) {
 	customResources, ok := componentCustomResources[componentName]
 	if !ok || len(customResources) == 0 {
 		return nil, 0, nil
 	}
 
-	// CustomResources should contain exactly one entry per component - the merged/resolved resource.
+	// Recipe resolution guarantees exactly one entry per component - the explicit or default resourcesFile.
 	// GetMergedCustomResource upstream already handles base + overlay merging.
 	if len(customResources) != 1 {
-		slog.Warn("unexpected number of custom resources for component",
-			"component", componentName, "count", len(customResources))
+		return nil, 0, errors.New(errors.ErrCodeInternal,
+			fmt.Sprintf("expected exactly 1 custom resource for component %s, got %d", componentName, len(customResources)))
 	}
 
-	// Use the first (and ideally only) custom resource
+	// Use the single custom resource
 	var content []byte
 	for _, c := range customResources {
 		content = c
@@ -598,15 +646,10 @@ func (g *Generator) generateRootREADME(ctx context.Context, components []Compone
 		}
 	}
 
-	var service string
-	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
-		service = string(g.RecipeResult.Criteria.Service)
-	}
-
 	data := readmeTemplateData{
 		RecipeVersion:      g.RecipeResult.Metadata.Version,
 		BundlerVersion:     g.Version,
-		Service:            service,
+		Service:            g.getService(),
 		Components:         components,
 		ComponentsReversed: reverseComponents(components),
 		Criteria:           criteriaLines,
@@ -623,64 +666,26 @@ func (g *Generator) generateRootREADME(ctx context.Context, components []Compone
 
 // generateDeployScript creates the deploy.sh automation script.
 func (g *Generator) generateDeployScript(ctx context.Context, components []ComponentData, outputDir string) (string, int64, error) {
-	if err := ctx.Err(); err != nil {
-		return "", 0, err
-	}
-
-	var service string
-	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
-		service = string(g.RecipeResult.Criteria.Service)
-	}
-
 	data := deployTemplateData{
 		BundlerVersion: g.Version,
-		Service:        service,
+		Service:        g.getService(),
 		Components:     components,
 	}
 
-	deployPath, deploySize, err := deployer.GenerateFromTemplate(deployScriptTemplate, data, outputDir, "deploy.sh")
-	if err != nil {
-		return "", 0, err
-	}
-
-	// Make executable
-	if err := os.Chmod(deployPath, 0755); err != nil {
-		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set deploy.sh permissions", err)
-	}
-
-	return deployPath, deploySize, nil
+	return g.generateExecutableScript(ctx, deployScriptTemplate, data, outputDir, "deploy.sh", "deploy.sh")
 }
 
 // generateUndeployScript creates the undeploy.sh automation script.
 func (g *Generator) generateUndeployScript(ctx context.Context, components []ComponentData, outputDir string) (string, int64, error) {
-	if err := ctx.Err(); err != nil {
-		return "", 0, err
-	}
-
-	var service string
-	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
-		service = string(g.RecipeResult.Criteria.Service)
-	}
-
 	reversed := reverseComponents(components)
 	data := undeployTemplateData{
 		BundlerVersion:     g.Version,
-		Service:            service,
+		Service:            g.getService(),
 		ComponentsReversed: reversed,
 		Namespaces:         uniqueNamespaces(reversed),
 	}
 
-	undeployPath, undeploySize, err := deployer.GenerateFromTemplate(undeployScriptTemplate, data, outputDir, "undeploy.sh")
-	if err != nil {
-		return "", 0, err
-	}
-
-	// Make executable
-	if err := os.Chmod(undeployPath, 0755); err != nil {
-		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set undeploy.sh permissions", err)
-	}
-
-	return undeployPath, undeploySize, nil
+	return g.generateExecutableScript(ctx, undeployScriptTemplate, data, outputDir, "undeploy.sh", "undeploy.sh")
 }
 
 // generateSubscribeScript creates the subscribe.sh automation script for OLM components.
@@ -705,48 +710,25 @@ func (g *Generator) generateSubscribeScript(ctx context.Context, components []Co
 	}
 
 	// Collect OLM components for template
-	type OLMComponent struct {
-		Name      string
-		Namespace string
-	}
-	olmComponents := []OLMComponent{}
-	for _, comp := range components {
-		if comp.HasInstallFiles {
-			olmComponents = append(olmComponents, OLMComponent{
-				Name:      comp.Name,
-				Namespace: comp.Namespace,
-			})
-		}
-	}
-
-	var service string
-	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
-		service = string(g.RecipeResult.Criteria.Service)
-	}
+	olmComponents := collectOLMComponents(components)
 
 	data := struct {
 		BundlerVersion string
 		Service        string
-		OLMComponents  []OLMComponent
+		OLMComponents  []OLMComponentData
 	}{
 		BundlerVersion: g.Version,
-		Service:        service,
+		Service:        g.getService(),
 		OLMComponents:  olmComponents,
 	}
 
-	installPath, installSize, err := deployer.GenerateFromTemplate(subscribeScriptTemplate, data, outputDir, "subscribe.sh")
+	path, size, err := g.generateExecutableScript(ctx, subscribeScriptTemplate, data, outputDir, "subscribe.sh", "subscribe.sh")
 	if err != nil {
 		return "", 0, err
 	}
 
-	// Make executable
-	if err := os.Chmod(installPath, 0755); err != nil {
-		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set subscribe.sh permissions", err)
-	}
-
 	slog.Debug("generated subscribe.sh script")
-
-	return installPath, installSize, nil
+	return path, size, nil
 }
 
 // generateUnsubscribeScript creates the unsubscribe.sh automation script for OLM components.
@@ -770,55 +752,32 @@ func (g *Generator) generateUnsubscribeScript(ctx context.Context, components []
 		return "", 0, nil
 	}
 
-	// Collect OLM components for template (reuse same structure as install script)
-	type OLMComponent struct {
-		Name      string
-		Namespace string
-	}
-	olmComponents := []OLMComponent{}
-	for _, comp := range components {
-		if comp.HasInstallFiles {
-			olmComponents = append(olmComponents, OLMComponent{
-				Name:      comp.Name,
-				Namespace: comp.Namespace,
-			})
-		}
-	}
+	// Collect OLM components for template
+	olmComponents := collectOLMComponents(components)
 
 	// Reverse the order for uninstall (dependencies first)
-	olmComponentsReversed := make([]OLMComponent, len(olmComponents))
+	olmComponentsReversed := make([]OLMComponentData, len(olmComponents))
 	for i, comp := range olmComponents {
 		olmComponentsReversed[len(olmComponents)-1-i] = comp
-	}
-
-	var service string
-	if g.RecipeResult != nil && g.RecipeResult.Criteria != nil {
-		service = string(g.RecipeResult.Criteria.Service)
 	}
 
 	data := struct {
 		BundlerVersion string
 		Service        string
-		OLMComponents  []OLMComponent
+		OLMComponents  []OLMComponentData
 	}{
 		BundlerVersion: g.Version,
-		Service:        service,
+		Service:        g.getService(),
 		OLMComponents:  olmComponentsReversed,
 	}
 
-	uninstallPath, uninstallSize, err := deployer.GenerateFromTemplate(unsubscribeScriptTemplate, data, outputDir, "unsubscribe.sh")
+	path, size, err := g.generateExecutableScript(ctx, unsubscribeScriptTemplate, data, outputDir, "unsubscribe.sh", "unsubscribe.sh")
 	if err != nil {
 		return "", 0, err
 	}
 
-	// Make executable
-	if err := os.Chmod(uninstallPath, 0755); err != nil {
-		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set unsubscribe.sh permissions", err)
-	}
-
 	slog.Debug("generated unsubscribe.sh script")
-
-	return uninstallPath, uninstallSize, nil
+	return path, size, nil
 }
 
 // readmeTemplateData is the template data for root README.md generation.

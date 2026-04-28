@@ -1246,6 +1246,140 @@ func TestMake_ArgoCDRejectsDynamic(t *testing.T) {
 	}
 }
 
+// TestMake_OLMComponentsRequireHelmDeployer verifies that OLM components
+// can only be used with --deployer helm, and fail fast with clear error
+// messages for argocd/argocd-helm deployers.
+func TestMake_OLMComponentsRequireHelmDeployer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		deployer config.DeployerType
+	}{
+		{"argocd deployer rejects OLM", config.DeployerArgoCD},
+		{"argocd-helm deployer rejects OLM", config.DeployerArgoCDHelm},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg := config.NewConfig(
+				config.WithDeployer(tt.deployer),
+				config.WithRepoURL("https://github.com/org/repo.git"),
+				config.WithVersion("v1.0.0"),
+			)
+			bundler, err := New(WithConfig(cfg))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+
+			recipeResult := &recipe.RecipeResult{
+				APIVersion: "aicr.nvidia.com/v1alpha1",
+				Kind:       "Recipe",
+				Criteria: &recipe.Criteria{
+					Service:     "ocp",
+					Accelerator: "h100",
+					Intent:      "inference",
+				},
+				ComponentRefs: []recipe.ComponentRef{
+					{
+						Name:    "gpu-operator",
+						Version: "v25.3.3",
+						Type:    recipe.ComponentTypeHelm,
+						Source:  "https://helm.ngc.nvidia.com/nvidia",
+					},
+					{
+						Name:    "nfd",
+						Version: "4.18.1",
+						Type:    recipe.ComponentTypeOLM,
+						Source:  "redhat-operators",
+					},
+				},
+				DeploymentOrder: []string{"nfd", "gpu-operator"},
+			}
+
+			ctx := context.Background()
+			tmpDir := t.TempDir()
+
+			_, err = bundler.Make(ctx, recipeResult, tmpDir)
+			if err == nil {
+				t.Fatal("expected error for OLM component with non-Helm deployer, got nil")
+			}
+
+			errMsg := err.Error()
+			if !strings.Contains(errMsg, "OLM") {
+				t.Errorf("error should mention OLM, got: %v", err)
+			}
+			if !strings.Contains(errMsg, "nfd") {
+				t.Errorf("error should mention the OLM component name (nfd), got: %v", err)
+			}
+			if !strings.Contains(errMsg, string(tt.deployer)) {
+				t.Errorf("error should mention the current deployer (%s), got: %v", tt.deployer, err)
+			}
+			if !strings.Contains(errMsg, "helm") {
+				t.Errorf("error should mention helm as the required deployer, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestMake_OLMComponentsSucceedWithHelmDeployer verifies that OLM components
+// work correctly when using the Helm deployer (the only supported deployer for OLM).
+func TestMake_OLMComponentsSucceedWithHelmDeployer(t *testing.T) {
+	cfg := config.NewConfig(
+		config.WithDeployer(config.DeployerHelm),
+		config.WithVersion("v1.0.0"),
+	)
+	bundler, err := New(WithConfig(cfg))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	recipeResult := &recipe.RecipeResult{
+		APIVersion: "aicr.nvidia.com/v1alpha1",
+		Kind:       "Recipe",
+		Criteria: &recipe.Criteria{
+			Service:     "ocp",
+			Accelerator: "h100",
+			Intent:      "inference",
+		},
+		ComponentRefs: []recipe.ComponentRef{
+			{
+				Name:    "nfd",
+				Version: "4.18.1",
+				Type:    recipe.ComponentTypeOLM,
+				Source:  "redhat-operators",
+			},
+		},
+		DeploymentOrder: []string{"nfd"},
+	}
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	output, err := bundler.Make(ctx, recipeResult, tmpDir)
+	if err != nil {
+		t.Fatalf("Make() with Helm deployer should succeed for OLM components, got error: %v", err)
+	}
+
+	if output == nil {
+		t.Fatal("Make() returned nil output")
+	}
+
+	// Verify OLM component directory was created
+	nfdDir := filepath.Join(tmpDir, "nfd")
+	if _, statErr := os.Stat(nfdDir); os.IsNotExist(statErr) {
+		t.Error("expected nfd directory to be created")
+	}
+
+	// Verify README was created
+	readmePath := filepath.Join(tmpDir, "nfd", "README.md")
+	if _, statErr := os.Stat(readmePath); os.IsNotExist(statErr) {
+		t.Error("expected nfd/README.md to be created")
+	}
+}
+
 // computeTestChecksum computes SHA256 hash for test comparison.
 func computeTestChecksum(content []byte) string {
 	hash := make([]byte, 32)

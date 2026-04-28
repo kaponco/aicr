@@ -113,7 +113,7 @@ kubectl create namespace {{ .Namespace }} --dry-run=client -o yaml | kubectl app
 {{ if .HasInstallFiles -}}
 # Install OLM resources (Subscription, OperatorGroup)
 {{- range .InstallFiles }}
-kubectl apply -f {{ $compName }}/{{ .Path }}
+kubectl apply -f {{ $compName }}/{{ .Path }} -n {{ $compNS }}
 {{- end }}
 # Wait for operator to be ready
 kubectl wait --for=jsonpath='{.status.phase}'=Succeeded csv -n {{ .Namespace }} --all --timeout=5m

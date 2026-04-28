@@ -540,7 +540,7 @@ When using snapshot mode, the recipe builder extracts environment parameters fro
 - **release subtype** → OS family (ubuntu, rhel, cos, amazonlinux)
 
 **From Kubernetes Measurements:**
-- **server subtype** → K8s service provider (eks, gke, aks) inferred from images
+- **server subtype** → K8s service provider (eks, gke, aks, ocp) inferred from images
 
 **From GPU Measurements:**
 - **Product Name** → GPU type detection (H100, GB200, B200, A100, L40, RTX PRO 6000)
@@ -1697,7 +1697,7 @@ mkdir -p "$OUTPUT_DIR"
 GPU_TYPES=("h100" "gb200" "b200" "a100" "l40" "rtx-pro-6000")
 
 # Kubernetes services
-K8S_SERVICES=("eks" "gke" "aks" "oke" "kind" "lke")
+K8S_SERVICES=("eks" "gke" "aks" "oke" "ocp" "kind" "lke")
 
 # OS distributions
 OS_TYPES=("ubuntu" "rhel" "cos")

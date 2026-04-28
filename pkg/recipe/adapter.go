@@ -39,6 +39,45 @@ func GetManifestContent(path string) ([]byte, error) {
 	return provider.ReadFile(path)
 }
 
+// loadAndMergeYAMLFiles loads a base file (if exists) and an overlay file,
+// parses both as YAML, and merges them using MergeValues().
+// Returns the merged map. If basePath is empty or base file doesn't exist, uses only overlay.
+func loadAndMergeYAMLFiles(provider DataProvider, basePath, overlayPath string) (map[string]any, error) {
+	result := make(map[string]any)
+
+	// Load base file (optional)
+	if basePath != "" {
+		baseData, err := provider.ReadFile(basePath)
+		if err == nil {
+			// Base file exists, parse it
+			if parseErr := yaml.Unmarshal(baseData, &result); parseErr != nil {
+				return nil, errors.Wrap(errors.ErrCodeInternal,
+					fmt.Sprintf("failed to parse base file %q", basePath), parseErr)
+			}
+		}
+		// If base doesn't exist, continue with empty result
+	}
+
+	// Load overlay file
+	overlayData, err := provider.ReadFile(overlayPath)
+	if err != nil {
+		return nil, errors.Wrap(errors.ErrCodeInternal,
+			fmt.Sprintf("failed to read overlay file %q", overlayPath), err)
+	}
+
+	// Parse overlay
+	var overlayContent map[string]any
+	if err := yaml.Unmarshal(overlayData, &overlayContent); err != nil {
+		return nil, errors.Wrap(errors.ErrCodeInternal,
+			fmt.Sprintf("failed to parse overlay file %q", overlayPath), err)
+	}
+
+	// Merge overlay into base (overlay takes precedence)
+	MergeValues(result, overlayContent)
+
+	return result, nil
+}
+
 // GetMergedCustomResource retrieves and merges a custom resource file with its base (if applicable).
 // For overlay files (e.g., resources-ocp-training.yaml), it loads the base file (e.g., resources-ocp.yaml),
 // merges it with the overlay, and returns the merged YAML.
@@ -56,38 +95,14 @@ func GetMergedCustomResource(path string) ([]byte, error) {
 		return provider.ReadFile(path)
 	}
 
-	// Try to load base file
-	baseData, err := provider.ReadFile(basePath)
+	// Load and merge base + overlay
+	merged, err := loadAndMergeYAMLFiles(provider, basePath, path)
 	if err != nil {
-		// Base file doesn't exist, just return overlay content as-is
-		return provider.ReadFile(path)
+		return nil, err
 	}
-
-	// Load overlay file
-	overlayData, err := provider.ReadFile(path)
-	if err != nil {
-		return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to read overlay resource file %q", path), err)
-	}
-
-	// Parse base YAML
-	var baseContent map[string]any
-	err = yaml.Unmarshal(baseData, &baseContent)
-	if err != nil {
-		return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to parse base resource file %q", basePath), err)
-	}
-
-	// Parse overlay YAML
-	var overlayContent map[string]any
-	err = yaml.Unmarshal(overlayData, &overlayContent)
-	if err != nil {
-		return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to parse overlay resource file %q", path), err)
-	}
-
-	// Merge overlay into base (overlay takes precedence)
-	mergeValues(baseContent, overlayContent)
 
 	// Marshal merged content back to YAML
-	mergedData, err := yaml.Marshal(baseContent)
+	mergedData, err := yaml.Marshal(merged)
 	if err != nil {
 		return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to marshal merged resource for %q", path), err)
 	}
@@ -229,31 +244,12 @@ func (r *RecipeResult) GetValuesForComponent(name string) (map[string]any, error
 		isOverlay := ref.ValuesFile != baseValuesFile
 
 		if isOverlay {
-			// Load base values first
-			baseData, err := provider.ReadFile(baseValuesFile)
+			// Load and merge base + overlay values
+			var err error
+			result, err = loadAndMergeYAMLFiles(provider, baseValuesFile, ref.ValuesFile)
 			if err != nil {
-				// If base file doesn't exist, that's okay - just use overlay
-				result = make(map[string]any)
-			} else {
-				err = yaml.Unmarshal(baseData, &result)
-				if err != nil {
-					return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to parse base values file %q", baseValuesFile), err)
-				}
+				return nil, err
 			}
-
-			// Load overlay values
-			overlayData, err := provider.ReadFile(ref.ValuesFile)
-			if err != nil {
-				return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to read overlay values file %q", ref.ValuesFile), err)
-			}
-
-			var overlayValues map[string]any
-			if err := yaml.Unmarshal(overlayData, &overlayValues); err != nil {
-				return nil, errors.Wrap(errors.ErrCodeInternal, fmt.Sprintf("failed to parse overlay values file %q", ref.ValuesFile), err)
-			}
-
-			// Merge overlay into base (overlay takes precedence over base)
-			mergeValues(result, overlayValues)
 		} else {
 			// Just load the base values file
 			data, err := provider.ReadFile(ref.ValuesFile)
@@ -269,17 +265,18 @@ func (r *RecipeResult) GetValuesForComponent(name string) (map[string]any, error
 
 	// Step 2: Apply inline overrides (highest precedence)
 	if len(ref.Overrides) > 0 {
-		mergeValues(result, ref.Overrides)
+		MergeValues(result, ref.Overrides)
 	}
 
 	return result, nil
 }
 
-// mergeValues recursively merges src into dst.
+// MergeValues recursively merges src into dst.
 // For maps, it recursively merges nested keys.
 // For other types, src values override dst values.
 // A nil value in src deletes the key from dst (explicit null override).
-func mergeValues(dst, src map[string]any) {
+// This is used for merging recipe overlays and applying user overrides to custom resources.
+func MergeValues(dst, src map[string]any) {
 	for key, srcVal := range src {
 		// Explicit null in overlay means "delete this key"
 		if srcVal == nil {
@@ -290,7 +287,7 @@ func mergeValues(dst, src map[string]any) {
 			// If both are maps, merge recursively
 			if dstMap, dstOK := dstVal.(map[string]any); dstOK {
 				if srcMap, srcOK := srcVal.(map[string]any); srcOK {
-					mergeValues(dstMap, srcMap)
+					MergeValues(dstMap, srcMap)
 					continue
 				}
 			}

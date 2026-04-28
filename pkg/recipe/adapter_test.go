@@ -178,11 +178,11 @@ func TestMergeValues(t *testing.T) {
 			}
 
 			// Merge overlay into dst
-			mergeValues(dst, tt.overlay)
+			MergeValues(dst, tt.overlay)
 
 			// Compare results
 			if !mapsEqual(dst, tt.expected) {
-				t.Errorf("mergeValues() result mismatch\ngot:  %+v\nwant: %+v", dst, tt.expected)
+				t.Errorf("MergeValues() result mismatch\ngot:  %+v\nwant: %+v", dst, tt.expected)
 			}
 		})
 	}

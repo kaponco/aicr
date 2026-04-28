@@ -309,7 +309,7 @@ Supported content types:
 
 | Parameter | Type | Validation | Example |
 |-----------|------|------------|--------|
-| `service` | ServiceType | Enum: eks, gke, aks, oke, kind, lke, any | `service=eks` |
+| `service` | ServiceType | Enum: eks, gke, aks, oke, ocp, kind, lke, any | `service=eks` |
 | `accelerator` | AcceleratorType | Enum: h100, gb200, b200, a100, l40, rtx-pro-6000, any | `accelerator=h100` |
 | `gpu` | AcceleratorType | Alias for accelerator | `gpu=h100` |
 | `intent` | IntentType | Enum: training, inference, any | `intent=training` |
@@ -331,7 +331,7 @@ Shared with CLI - same logic as described in CLI architecture.
 #### GET Method
 
 **Query Parameters**:
-- `service` - Kubernetes service type (eks, gke, aks, oke, kind, lke)
+- `service` - Kubernetes service type (eks, gke, aks, oke, ocp, kind, lke)
 - `accelerator` - GPU/accelerator type (h100, gb200, b200, a100, l40, rtx-pro-6000)
 - `gpu` - Alias for accelerator (backwards compatibility)
 - `intent` - Workload intent (training, inference)
@@ -2167,7 +2167,7 @@ type RecipeRequest struct {
     OS       string `validate:"required,oneof=ubuntu rhel cos"`
     OSVersion string `validate:"omitempty,semver"`
     GPU      string `validate:"required,oneof=h100 gb200 b200 a100 l40 rtx-pro-6000"`
-    Service  string `validate:"omitempty,oneof=eks gke aks oke kind lke"`
+    Service  string `validate:"omitempty,oneof=eks gke aks oke ocp kind lke"`
 }
 
 func handleRecipe(w http.ResponseWriter, r *http.Request) {

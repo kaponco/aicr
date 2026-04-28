@@ -22,20 +22,26 @@ echo ""
 
 echo "==> Uninstalling {{ .Name }}"
 
+# Get CSV name from Subscription before deleting
+CSV_NAME=$(kubectl get -f "${SCRIPT_DIR}/{{ .Name }}/install.yaml" -n {{ .Namespace }} -o jsonpath='{.items[?(@.kind=="Subscription")].status.currentCSV}' 2>/dev/null || echo "")
+
 # Delete custom resources first to allow operator cleanup
 if [ -f "${SCRIPT_DIR}/{{ .Name }}/resources.yaml" ]; then
   echo "    Deleting custom resources for {{ .Name }}"
-  kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/resources.yaml" --ignore-not-found --timeout=60s
+  kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/resources.yaml" -n {{ .Namespace }} --ignore-not-found --timeout=60s
 fi
 
 # Delete OLM installation manifests (Subscription, OperatorGroup)
 echo "    Deleting {{ .Name }}/install.yaml"
-kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/install.yaml" --ignore-not-found
+kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/install.yaml" -n {{ .Namespace }} --ignore-not-found
 
-# Delete CSV (ClusterServiceVersion) for this specific operator
-# Note: This targets CSVs in the component's namespace only
-echo "    Waiting for CSV cleanup in namespace {{ .Namespace }}"
-kubectl wait csv --all --for=delete -n {{ .Namespace }} --timeout=60s 2>/dev/null || true
+# Delete the specific CSV if found
+if [ -n "$CSV_NAME" ]; then
+  echo "    Deleting CSV $CSV_NAME in namespace {{ .Namespace }}"
+  kubectl delete csv "$CSV_NAME" -n {{ .Namespace }} --ignore-not-found --timeout=60s
+else
+  echo "    Warning: Could not determine CSV name for {{ .Name }}"
+fi
 
 echo "    ✓ {{ .Name }} uninstalled"
 echo ""
