@@ -1328,3 +1328,233 @@ func TestMake_PreservesTimeoutFromExtractValues(t *testing.T) {
 			errors.ErrCodeTimeout, se.Code, err)
 	}
 }
+
+func TestMake_OLMComponentRejectsSetFlag(t *testing.T) {
+	cfg := config.NewConfig(
+		config.WithValueOverrides(map[string]map[string]string{
+			"gpuoperator": {"driver.version": "570.86.16"},
+		}),
+	)
+	bundler, err := New(WithConfig(cfg))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	recipeResult := &recipe.RecipeResult{
+		ComponentRefs: []recipe.ComponentRef{
+			{Name: "gpu-operator", Type: recipe.ComponentTypeOLM},
+		},
+	}
+
+	_, err = bundler.Make(ctx, recipeResult, tmpDir)
+	if err == nil {
+		t.Fatal("expected error for OLM component with --set, got nil")
+	}
+	if !strings.Contains(err.Error(), "--set") {
+		t.Errorf("error should mention --set flag, got: %v", err)
+	}
+}
+
+func TestMake_OLMComponentRejectsNodeSelector(t *testing.T) {
+	cfg := config.NewConfig(
+		config.WithSystemNodeSelector(map[string]string{"nodeGroup": "system"}),
+	)
+	bundler, err := New(WithConfig(cfg))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	recipeResult := &recipe.RecipeResult{
+		ComponentRefs: []recipe.ComponentRef{
+			{Name: "gpu-operator", Type: recipe.ComponentTypeOLM},
+		},
+	}
+
+	_, err = bundler.Make(ctx, recipeResult, tmpDir)
+	if err == nil {
+		t.Fatal("expected error for OLM component with --system-node-selector, got nil")
+	}
+	if !strings.Contains(err.Error(), "--system-node-selector") {
+		t.Errorf("error should mention --system-node-selector, got: %v", err)
+	}
+}
+
+func TestMake_OLMComponentAllowsEnabledFlag(t *testing.T) {
+	cfg := config.NewConfig(
+		config.WithValueOverrides(map[string]map[string]string{
+			"gpuoperator": {"enabled": "false"},
+		}),
+	)
+	bundler, err := New(WithConfig(cfg))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	recipeResult := &recipe.RecipeResult{
+		ComponentRefs: []recipe.ComponentRef{
+			{Name: "gpu-operator", Type: recipe.ComponentTypeOLM},
+			{Name: "nfd", Type: recipe.ComponentTypeHelm, Source: "https://example.com"},
+		},
+	}
+
+	output, err := bundler.Make(ctx, recipeResult, tmpDir)
+	if err != nil {
+		t.Fatalf("--set enabled should be allowed for OLM components, got error: %v", err)
+	}
+	if output == nil {
+		t.Fatal("Make() returned nil output")
+	}
+}
+
+func TestMake_NonOLMComponentAllowsFlags(t *testing.T) {
+	cfg := config.NewConfig(
+		config.WithValueOverrides(map[string]map[string]string{
+			"gpuoperator": {"driver.version": "570.86.16"},
+		}),
+		config.WithSystemNodeSelector(map[string]string{"nodeGroup": "system"}),
+	)
+	bundler, err := New(WithConfig(cfg))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	recipeResult := &recipe.RecipeResult{
+		ComponentRefs: []recipe.ComponentRef{
+			{Name: "gpu-operator", Type: recipe.ComponentTypeHelm, Source: "https://helm.ngc.nvidia.com/nvidia", Version: "v25.3.3"},
+		},
+	}
+
+	output, err := bundler.Make(ctx, recipeResult, tmpDir)
+	if err != nil {
+		t.Fatalf("Helm components should allow all flags, got error: %v", err)
+	}
+	if output == nil {
+		t.Fatal("Make() returned nil output")
+	}
+}
+
+func TestMake_ArgoCDDeployerRejectsOLM(t *testing.T) {
+	cfg := config.NewConfig(
+		config.WithDeployer(config.DeployerArgoCD),
+	)
+	bundler, err := New(WithConfig(cfg))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	recipeResult := &recipe.RecipeResult{
+		ComponentRefs: []recipe.ComponentRef{
+			{Name: "gpu-operator", Type: recipe.ComponentTypeOLM},
+		},
+	}
+
+	_, err = bundler.Make(ctx, recipeResult, tmpDir)
+	if err == nil {
+		t.Fatal("expected error for ArgoCD deployer with OLM component, got nil")
+	}
+	errMsg := err.Error()
+	if !strings.Contains(errMsg, "argocd") {
+		t.Errorf("error should mention deployer, got: %v", err)
+	}
+	if !strings.Contains(errMsg, "OLM") {
+		t.Errorf("error should mention OLM, got: %v", err)
+	}
+}
+
+func TestMake_ArgoCDHelmDeployerRejectsOLM(t *testing.T) {
+	cfg := config.NewConfig(
+		config.WithDeployer(config.DeployerArgoCDHelm),
+	)
+	bundler, err := New(WithConfig(cfg))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	recipeResult := &recipe.RecipeResult{
+		ComponentRefs: []recipe.ComponentRef{
+			{Name: "gpu-operator", Type: recipe.ComponentTypeOLM},
+		},
+	}
+
+	_, err = bundler.Make(ctx, recipeResult, tmpDir)
+	if err == nil {
+		t.Fatal("expected error for ArgoCD-Helm deployer with OLM component, got nil")
+	}
+	if !strings.Contains(err.Error(), "argocd-helm") {
+		t.Errorf("error should mention deployer, got: %v", err)
+	}
+}
+
+func TestMake_HelmDeployerAllowsOLM(t *testing.T) {
+	cfg := config.NewConfig(
+		config.WithDeployer(config.DeployerHelm),
+	)
+	bundler, err := New(WithConfig(cfg))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	recipeResult := &recipe.RecipeResult{
+		ComponentRefs: []recipe.ComponentRef{
+			{Name: "gpu-operator", Type: recipe.ComponentTypeOLM},
+		},
+	}
+
+	output, err := bundler.Make(ctx, recipeResult, tmpDir)
+	if err != nil {
+		t.Fatalf("Helm deployer should allow OLM components, got error: %v", err)
+	}
+	if output == nil {
+		t.Fatal("Make() returned nil output")
+	}
+}
+
+func TestMake_ArgoCDDeployerAllowsNonOLM(t *testing.T) {
+	cfg := config.NewConfig(
+		config.WithDeployer(config.DeployerArgoCD),
+		config.WithRepoURL("https://github.com/example/repo"),
+	)
+	bundler, err := New(WithConfig(cfg))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+
+	recipeResult := &recipe.RecipeResult{
+		ComponentRefs: []recipe.ComponentRef{
+			{Name: "gpu-operator", Type: recipe.ComponentTypeHelm, Source: "https://helm.ngc.nvidia.com/nvidia", Version: "v25.3.3"},
+		},
+	}
+
+	output, err := bundler.Make(ctx, recipeResult, tmpDir)
+	if err != nil {
+		t.Fatalf("ArgoCD deployer should allow non-OLM components, got error: %v", err)
+	}
+	if output == nil {
+		t.Fatal("Make() returned nil output")
+	}
+}
+

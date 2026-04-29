@@ -226,6 +226,16 @@ func (b *DefaultBundler) Make(ctx context.Context, recipeResult *recipe.RecipeRe
 			"recipe has no enabled components after filtering")
 	}
 
+	// Validate CLI flags don't conflict with OLM components
+	if err := b.validateOLMComponentFlags(recipeResult); err != nil {
+		return nil, err
+	}
+
+	// Validate deployer supports OLM components
+	if err := b.validateDeployerSupportsOLM(recipeResult); err != nil {
+		return nil, err
+	}
+
 	// Set default output directory
 	if dir == "" {
 		dir = "."
@@ -1007,4 +1017,94 @@ func (b *DefaultBundler) collectComponentManifests(ctx context.Context, recipeRe
 	}
 
 	return result, nil
+}
+
+// validateOLMComponentFlags validates that CLI flags don't conflict with OLM components.
+// Returns error immediately on first conflict (fail fast).
+func (b *DefaultBundler) validateOLMComponentFlags(recipeResult *recipe.RecipeResult) error {
+	if b.Config == nil {
+		return nil
+	}
+
+	registry, err := recipe.GetComponentRegistry()
+	if err != nil {
+		return nil
+	}
+
+	for _, ref := range recipeResult.ComponentRefs {
+		if ref.Type != recipe.ComponentTypeOLM {
+			continue
+		}
+
+		comp := registry.Get(ref.Name)
+		if comp == nil {
+			continue
+		}
+
+		// Check --set overrides (except "enabled")
+		if overrides := b.getValueOverridesForComponent(ref.Name); len(overrides) > 0 {
+			for k := range overrides {
+				if k != "enabled" {
+					return errors.New(errors.ErrCodeInvalidRequest,
+						fmt.Sprintf("--set overrides not supported for OLM component %q", ref.Name))
+				}
+			}
+		}
+
+		// Check node scheduling flags
+		if len(b.Config.SystemNodeSelector()) > 0 && len(comp.GetSystemNodeSelectorPaths()) > 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("--system-node-selector not supported for OLM component %q", ref.Name))
+		}
+		if len(b.Config.AcceleratedNodeSelector()) > 0 && len(comp.GetAcceleratedNodeSelectorPaths()) > 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("--accelerated-node-selector not supported for OLM component %q", ref.Name))
+		}
+		if len(b.Config.SystemNodeTolerations()) > 0 && len(comp.GetSystemTolerationPaths()) > 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("--system-node-toleration not supported for OLM component %q", ref.Name))
+		}
+		if len(b.Config.AcceleratedNodeTolerations()) > 0 && len(comp.GetAcceleratedTolerationPaths()) > 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("--accelerated-node-toleration not supported for OLM component %q", ref.Name))
+		}
+		if len(b.Config.WorkloadSelector()) > 0 && len(comp.GetWorkloadSelectorPaths()) > 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("--workload-selector not supported for OLM component %q", ref.Name))
+		}
+		if b.Config.WorkloadGateTaint() != nil && len(comp.GetAcceleratedTaintStrPaths()) > 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("--workload-gate not supported for OLM component %q", ref.Name))
+		}
+		if b.Config.EstimatedNodeCount() > 0 && len(comp.GetNodeCountPaths()) > 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("--estimated-nodes not supported for OLM component %q", ref.Name))
+		}
+	}
+
+	return nil
+}
+
+// validateDeployerSupportsOLM validates that the selected deployer supports OLM components.
+// ArgoCD and ArgoCD-Helm deployers cannot deploy OLM components because they expect
+// Helm charts or Kustomize sources, not OLM Subscriptions/OperatorGroups.
+func (b *DefaultBundler) validateDeployerSupportsOLM(recipeResult *recipe.RecipeResult) error {
+	if b.Config == nil {
+		return nil
+	}
+
+	deployer := b.Config.Deployer()
+	if deployer != config.DeployerArgoCD && deployer != config.DeployerArgoCDHelm {
+		return nil
+	}
+
+	// Check if recipe has any OLM components
+	for _, ref := range recipeResult.ComponentRefs {
+		if ref.Type == recipe.ComponentTypeOLM {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("deployer %q does not support OLM components (found %q); use deployer \"helm\" instead", deployer, ref.Name))
+		}
+	}
+
+	return nil
 }

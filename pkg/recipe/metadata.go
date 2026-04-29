@@ -645,6 +645,38 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 		result.HealthCheckAsserts = overlay.HealthCheckAsserts
 	}
 
+	// Clear type-incompatible fields when component type changes
+	if overlay.Type != "" && overlay.Type != base.Type {
+		switch result.Type {
+		case ComponentTypeOLM:
+			// Clear Helm-specific fields
+			result.Chart = ""
+			result.ValuesFile = ""
+			result.Source = ""
+			result.Version = ""
+			// Clear Kustomize-specific fields
+			result.Tag = ""
+			result.Path = ""
+			result.Patches = nil
+		case ComponentTypeHelm:
+			// Clear Kustomize-specific fields
+			result.Tag = ""
+			result.Path = ""
+			result.Patches = nil
+			// Clear OLM-specific fields
+			result.InstallFile = ""
+			result.ResourcesFile = ""
+		case ComponentTypeKustomize:
+			// Clear Helm-specific fields
+			result.Chart = ""
+			result.ValuesFile = ""
+			result.Version = ""
+			// Clear OLM-specific fields
+			result.InstallFile = ""
+			result.ResourcesFile = ""
+		}
+	}
+
 	return result
 }
 
@@ -725,6 +757,52 @@ func (s *RecipeMetadataSpec) detectCycles() error {
 		if !visited[c.Name] {
 			if err := dfs(c.Name); err != nil {
 				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// ValidateOLMComponents validates that OLM components don't have unsupported fields.
+// OLM components use static manifests and cannot have Helm/Kustomize-specific fields.
+func (s *RecipeMetadataSpec) ValidateOLMComponents() error {
+	for _, c := range s.ComponentRefs {
+		if c.Type != ComponentTypeOLM {
+			continue
+		}
+
+		// Check for Helm-specific fields
+		if c.Chart != "" {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("OLM component %q cannot have 'chart' field", c.Name))
+		}
+		if c.ValuesFile != "" {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("OLM component %q cannot have 'valuesFile' field", c.Name))
+		}
+
+		// Check for Kustomize-specific fields
+		if c.Tag != "" {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("OLM component %q cannot have 'tag' field", c.Name))
+		}
+		if c.Path != "" {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("OLM component %q cannot have 'path' field", c.Name))
+		}
+		if len(c.Patches) > 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("OLM component %q cannot have 'patches' field", c.Name))
+		}
+
+		// Check for overrides (only "enabled" is allowed)
+		if len(c.Overrides) > 0 {
+			for key := range c.Overrides {
+				if key != "enabled" {
+					return errors.New(errors.ErrCodeInvalidRequest,
+						fmt.Sprintf("OLM component %q cannot have 'overrides.%s' field (only 'enabled' is allowed)", c.Name, key))
+				}
 			}
 		}
 	}

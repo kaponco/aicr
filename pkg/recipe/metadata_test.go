@@ -145,6 +145,203 @@ func TestRecipeMetadataSpecValidateDependencies(t *testing.T) {
 	})
 }
 
+func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
+	tests := []struct {
+		name    string
+		spec    RecipeMetadataSpec
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid OLM component",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name:          "gpu-operator",
+						Type:          ComponentTypeOLM,
+						Namespace:     "gpu-operator",
+						InstallFile:   "components/gpu-operator/olm/install.yaml",
+						ResourcesFile: "components/gpu-operator/olm/resources-ocp.yaml",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid OLM component with enabled override",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name: "gpu-operator",
+						Type: ComponentTypeOLM,
+						Overrides: map[string]any{
+							"enabled": false,
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "OLM component with chart field",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name:  "gpu-operator",
+						Type:  ComponentTypeOLM,
+						Chart: "nvidia/gpu-operator",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "cannot have 'chart' field",
+		},
+		{
+			name: "OLM component with valuesFile",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name:       "gpu-operator",
+						Type:       ComponentTypeOLM,
+						ValuesFile: "components/gpu-operator/values.yaml",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "cannot have 'valuesFile' field",
+		},
+		{
+			name: "OLM component with tag",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name: "gpu-operator",
+						Type: ComponentTypeOLM,
+						Tag:  "v1.0.0",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "cannot have 'tag' field",
+		},
+		{
+			name: "OLM component with path",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name: "gpu-operator",
+						Type: ComponentTypeOLM,
+						Path: "deploy/production",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "cannot have 'path' field",
+		},
+		{
+			name: "OLM component with patches",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name:    "gpu-operator",
+						Type:    ComponentTypeOLM,
+						Patches: []string{"patch.yaml"},
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "cannot have 'patches' field",
+		},
+		{
+			name: "OLM component with value overrides",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name: "gpu-operator",
+						Type: ComponentTypeOLM,
+						Overrides: map[string]any{
+							"driver": map[string]any{
+								"version": "570.86.16",
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "cannot have 'overrides.driver' field",
+		},
+		{
+			name: "OLM component with multiple invalid overrides",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name: "gpu-operator",
+						Type: ComponentTypeOLM,
+						Overrides: map[string]any{
+							"enabled": true,
+							"driver": map[string]any{
+								"version": "570.86.16",
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "cannot have 'overrides.driver' field",
+		},
+		{
+			name: "mixed OLM and Helm components",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name: "gpu-operator",
+						Type: ComponentTypeOLM,
+					},
+					{
+						Name:       "cert-manager",
+						Type:       ComponentTypeHelm,
+						ValuesFile: "components/cert-manager/values.yaml",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "multiple OLM components, one invalid",
+			spec: RecipeMetadataSpec{
+				ComponentRefs: []ComponentRef{
+					{
+						Name: "nfd",
+						Type: ComponentTypeOLM,
+					},
+					{
+						Name:  "gpu-operator",
+						Type:  ComponentTypeOLM,
+						Chart: "nvidia/gpu-operator",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "gpu-operator",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.spec.ValidateOLMComponents()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateOLMComponents() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr && tt.errMsg != "" && err != nil {
+				if !strings.Contains(err.Error(), tt.errMsg) {
+					t.Errorf("ValidateOLMComponents() error = %v, want error containing %q", err, tt.errMsg)
+				}
+			}
+		})
+	}
+}
+
 func TestRecipeMetadataSpecTopologicalSort(t *testing.T) {
 	tests := []struct {
 		name    string
