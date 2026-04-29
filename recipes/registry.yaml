@@ -32,7 +32,6 @@
 #   olm:               Default OLM (Operator Lifecycle Manager) settings (for OLM components)
 #     defaultNamespace:  Default Kubernetes namespace for the operator
 #     installFile:       Path to OLM installation manifest (Subscription, OperatorGroup, etc.)
-#     kinds:             Kubernetes kinds (CRDs) this operator manages (e.g., ["ClusterPolicy"])
 #   testTier:          Optional override for component test tier detection
 #                      (scheduling, deploy, or gpu-aware). Used by tools/component-test/.
 #   nodeScheduling:    Paths in Helm values where node selectors/tolerations are injected
@@ -59,10 +58,8 @@ components:
       defaultChart: node-feature-discovery
       defaultNamespace: node-feature-discovery
     olm:
-      defaultNamespace: openshift-nfd
+      defaultNamespace: node-feature-discovery
       installFile: components/nfd/olm/install.yaml
-      kinds:
-        - NodeFeatureDiscovery
     nodeScheduling:
       system:
         nodeSelectorPaths:
@@ -99,8 +96,6 @@ components:
     olm:
       defaultNamespace: gpu-operator
       installFile: components/gpu-operator/olm/install.yaml
-      kinds:
-        - ClusterPolicy
     nodeScheduling:
       system:
         nodeSelectorPaths:
@@ -126,8 +121,6 @@ components:
     olm:
       defaultNamespace: nvidia-network-operator
       installFile: components/network-operator/olm/install.yaml
-      kinds:
-        - NicClusterPolicy
     nodeScheduling:
       system:
         nodeSelectorPaths:

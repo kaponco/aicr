@@ -26,10 +26,12 @@ echo "==> Uninstalling {{ .Name }}"
 CSV_NAME=$(kubectl get -f "${SCRIPT_DIR}/{{ .Name }}/install.yaml" -n {{ .Namespace }} -o jsonpath='{.items[?(@.kind=="Subscription")].status.currentCSV}' 2>/dev/null || echo "")
 
 # Delete custom resources first to allow operator cleanup
-if [ -f "${SCRIPT_DIR}/{{ .Name }}/resources.yaml" ]; then
+{{- if .ResourcesFileName }}
+if [ -f "${SCRIPT_DIR}/{{ .Name }}/{{ .ResourcesFileName }}" ]; then
   echo "    Deleting custom resources for {{ .Name }}"
-  kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/resources.yaml" -n {{ .Namespace }} --ignore-not-found --timeout=60s
+  kubectl delete -f "${SCRIPT_DIR}/{{ .Name }}/{{ .ResourcesFileName }}" -n {{ .Namespace }} --ignore-not-found --timeout=60s
 fi
+{{- end }}
 
 # Delete OLM installation manifests (Subscription, OperatorGroup)
 echo "    Deleting {{ .Name }}/install.yaml"
@@ -56,4 +58,4 @@ echo ""
 echo "==> OLM Operators Uninstallation Complete"
 echo ""
 echo "Note:"
-echo "  - Custom resources must be deleted separately via ./undeploy.sh or manually"
+echo "  - Namespaces are preserved and can be deleted manually if needed"

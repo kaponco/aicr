@@ -53,6 +53,9 @@ type ComponentConfig struct {
 	// Kustomize contains default Kustomize settings.
 	Kustomize KustomizeConfig `yaml:"kustomize,omitempty"`
 
+	// OLM contains default OLM (Operator Lifecycle Manager) settings.
+	OLM OLMConfig `yaml:"olm,omitempty"`
+
 	// NodeScheduling defines paths for injecting node selectors and tolerations.
 	NodeScheduling NodeSchedulingConfig `yaml:"nodeScheduling,omitempty"`
 
@@ -98,6 +101,16 @@ type KustomizeConfig struct {
 
 	// DefaultTag is the default Git tag, branch, or commit.
 	DefaultTag string `yaml:"defaultTag,omitempty"`
+}
+
+// OLMConfig contains default OLM (Operator Lifecycle Manager) settings for a component.
+type OLMConfig struct {
+	// DefaultNamespace is the Kubernetes namespace for the operator.
+	DefaultNamespace string `yaml:"defaultNamespace,omitempty"`
+
+	// InstallFile is the path to the OLM installation manifest (Subscription, OperatorGroup, etc.).
+	// Path is relative to the data directory. Example: "components/gpu-operator/olm/install.yaml"
+	InstallFile string `yaml:"installFile,omitempty"`
 }
 
 // NodeSchedulingConfig defines paths for node scheduling injection.
@@ -376,11 +389,15 @@ func (c *ComponentConfig) GetValidations() []ComponentValidationConfig {
 }
 
 // GetType returns the component deployment type based on which config is present.
-// Returns ComponentTypeKustomize if Kustomize.DefaultSource is set,
+// Returns ComponentTypeOLM if OLM.InstallFile is set,
+// ComponentTypeKustomize if Kustomize.DefaultSource is set,
 // otherwise returns ComponentTypeHelm (the default).
 func (c *ComponentConfig) GetType() ComponentType {
 	if c == nil {
 		return ComponentTypeHelm
+	}
+	if c.OLM.InstallFile != "" {
+		return ComponentTypeOLM
 	}
 	if c.Kustomize.DefaultSource != "" {
 		return ComponentTypeKustomize

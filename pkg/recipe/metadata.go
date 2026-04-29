@@ -107,6 +107,14 @@ type ComponentRef struct {
 	// Path is the path within the repository to the kustomization (for Kustomize).
 	Path string `json:"path,omitempty" yaml:"path,omitempty"`
 
+	// InstallFile is the path to the OLM installation manifest (for OLM components).
+	// Relative to data directory. Example: "components/gpu-operator/olm/install.yaml"
+	InstallFile string `json:"installFile,omitempty" yaml:"installFile,omitempty"`
+
+	// ResourcesFile is the path to the OLM custom resources file (for OLM components).
+	// Relative to data directory. Example: "components/gpu-operator/olm/resources-ocp.yaml"
+	ResourcesFile string `json:"resourcesFile,omitempty" yaml:"resourcesFile,omitempty"`
+
 	// Cleanup indicates whether to uninstall this component after validation.
 	// Used for validation infrastructure components (e.g., nccl-doctor).
 	Cleanup bool `json:"cleanup,omitempty" yaml:"cleanup,omitempty"`
@@ -238,6 +246,14 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		}
 		if ref.Path == "" && config.Kustomize.DefaultPath != "" {
 			ref.Path = config.Kustomize.DefaultPath
+		}
+	case ComponentTypeOLM:
+		// Apply OLM defaults
+		if ref.Namespace == "" && config.OLM.DefaultNamespace != "" {
+			ref.Namespace = config.OLM.DefaultNamespace
+		}
+		if ref.InstallFile == "" && config.OLM.InstallFile != "" {
+			ref.InstallFile = config.OLM.InstallFile
 		}
 	}
 
@@ -602,6 +618,16 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 	// Path: overlay takes precedence if set (for Kustomize)
 	if overlay.Path != "" {
 		result.Path = overlay.Path
+	}
+
+	// InstallFile: overlay takes precedence if set (for OLM)
+	if overlay.InstallFile != "" {
+		result.InstallFile = overlay.InstallFile
+	}
+
+	// ResourcesFile: overlay takes precedence if set (for OLM)
+	if overlay.ResourcesFile != "" {
+		result.ResourcesFile = overlay.ResourcesFile
 	}
 
 	// Cleanup: overlay takes precedence if true

@@ -28,7 +28,6 @@ kind: OperatorGroup
 metadata:
   name: nvidia-gpu-operator-group
 spec:
-  # NOTE: targetNamespaces must match the namespace this is deployed to.
-  # The {{NAMESPACE}} placeholder is replaced at bundle generation time.
+  # NOTE: targetNamespaces must match the namespace this is deployed to. Default ns is gpu-operator
   targetNamespaces:
-  - {{NAMESPACE}}
+  - gpu-operator

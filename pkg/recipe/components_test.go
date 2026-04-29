@@ -640,6 +640,17 @@ func TestComponentConfig_GetType(t *testing.T) {
 			},
 			expected: ComponentTypeKustomize,
 		},
+		{
+			name: "olm config returns OLM",
+			config: &ComponentConfig{
+				Name: "test",
+				OLM: OLMConfig{
+					DefaultNamespace: "operators",
+					InstallFile:      "components/test/olm/install.yaml",
+				},
+			},
+			expected: ComponentTypeOLM,
+		},
 	}
 
 	for _, tt := range tests {

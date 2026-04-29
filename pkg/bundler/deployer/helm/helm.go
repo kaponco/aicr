@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -39,6 +40,12 @@ var deployScriptTemplate string
 //go:embed templates/undeploy.sh.tmpl
 var undeployScriptTemplate string
 
+//go:embed templates/subscribe.sh.tmpl
+var subscribeScriptTemplate string
+
+//go:embed templates/unsubscribe.sh.tmpl
+var unsubscribeScriptTemplate string
+
 // criteriaAny is the wildcard value for criteria fields.
 const criteriaAny = "any"
 
@@ -48,22 +55,23 @@ const criteriaAny = "any"
 // templates: README.md's component table and deploy.sh / undeploy.sh
 // name-matched special-case blocks.
 type ComponentData struct {
-	Name           string
-	Namespace      string
-	Repository     string
-	ChartName      string
-	Version        string // Original version string (preserves 'v' prefix) for helm install --version
-	ChartVersion   string // Normalized version (no 'v' prefix) for chart metadata labels
-	HasManifests   bool
-	HasChart       bool
-	IsOCI          bool
-	IsKustomize    bool   // True when the component uses Kustomize instead of Helm
-	Tag            string // Git ref for Kustomize components (tag, branch, or commit)
-	Path           string // Path within the repository to the kustomization
-	IsOLM          bool   // True when the component uses OLM (Operator Lifecycle Manager)
-	InstallFile    string // Path to OLM install file (Subscription, OperatorGroup, etc.)
-	ResourcesFile  string // Path to custom resources file
-	Service        string // Service type (eks, gke, aks, ocp, etc.)
+	Name              string
+	Namespace         string
+	Repository        string
+	ChartName         string
+	Version           string // Original version string (preserves 'v' prefix) for helm install --version
+	ChartVersion      string // Normalized version (no 'v' prefix) for chart metadata labels
+	HasManifests      bool
+	HasChart          bool
+	IsOCI             bool
+	IsKustomize       bool   // True when the component uses Kustomize instead of Helm
+	Tag               string // Git ref for Kustomize components (tag, branch, or commit)
+	Path              string // Path within the repository to the kustomization
+	IsOLM             bool   // True when the component uses OLM (Operator Lifecycle Manager)
+	InstallFile       string // Path to OLM install file (Subscription, OperatorGroup, etc.)
+	ResourcesFile     string // Path to custom resources file
+	ResourcesFileName string // Just the filename of ResourcesFile (e.g., "resources-ocp.yaml")
+	Service           string // Service type (eks, gke, aks, ocp, etc.)
 }
 
 // compile-time interface check
@@ -183,6 +191,26 @@ func (g *Generator) Generate(ctx context.Context, outputDir string) (*deployer.O
 	output.Files = append(output.Files, undeployPath)
 	output.TotalSize += undeploySize
 
+	// Generate subscribe.sh and unsubscribe.sh for OLM components
+	olmComponents := filterOLMComponents(components)
+	if len(olmComponents) > 0 {
+		subscribePath, subscribeSize, subscribeErr := g.generateSubscribeScript(ctx, olmComponents, outputDir)
+		if subscribeErr != nil {
+			return nil, errors.Wrap(errors.ErrCodeInternal,
+				"failed to generate subscribe.sh", subscribeErr)
+		}
+		output.Files = append(output.Files, subscribePath)
+		output.TotalSize += subscribeSize
+
+		unsubscribePath, unsubscribeSize, unsubscribeErr := g.generateUnsubscribeScript(ctx, olmComponents, outputDir)
+		if unsubscribeErr != nil {
+			return nil, errors.Wrap(errors.ErrCodeInternal,
+				"failed to generate unsubscribe.sh", unsubscribeErr)
+		}
+		output.Files = append(output.Files, unsubscribePath)
+		output.TotalSize += unsubscribeSize
+	}
+
 	// Include external data files in the file list (for checksums)
 	if err := output.AddDataFiles(outputDir, g.DataFiles); err != nil {
 		return nil, err
@@ -230,20 +258,56 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 				fmt.Sprintf("invalid component name %q: must not contain path separators or parent directory references", ref.Name))
 		}
 
+		hasManifests := false
+		if g.ComponentManifests != nil {
+			if m, ok := g.ComponentManifests[ref.Name]; ok && len(m) > 0 {
+				hasManifests = true
+			}
+		}
+
+		isKustomize := ref.Type == recipe.ComponentTypeKustomize
+		isOLM := ref.Type == recipe.ComponentTypeOLM
+
 		chartName := ref.Chart
 		if chartName == "" {
 			chartName = ref.Name
 		}
 
+		isOCI := strings.HasPrefix(ref.Source, "oci://")
+		// Preserve version string as-is for deploy.sh --version flag.
+		// Helm handles 'v' prefixes correctly via fuzzy matching.
+		version := ref.Version
+
+		// Get service from recipe criteria
+		service := ""
+		if g.RecipeResult.Criteria != nil {
+			service = string(g.RecipeResult.Criteria.Service)
+		}
+
+		// Extract just the filename from ResourcesFile path for template use
+		resourcesFileName := ""
+		if ref.ResourcesFile != "" {
+			resourcesFileName = filepath.Base(ref.ResourcesFile)
+		}
+
 		components = append(components, ComponentData{
-			Name:       ref.Name,
-			Namespace:  ref.Namespace,
-			Repository: ref.Source,
-			ChartName:  chartName,
-			Version:    ref.Version,
-			IsOCI:      strings.HasPrefix(ref.Source, "oci://"),
-			Tag:        ref.Tag,
-			Path:       ref.Path,
+			Name:              ref.Name,
+			Namespace:         ref.Namespace,
+			Repository:        ref.Source,
+			ChartName:         chartName,
+			Version:           version,
+			ChartVersion:      deployer.NormalizeVersionWithDefault(ref.Version),
+			HasManifests:      hasManifests,
+			HasChart:          !isKustomize && !isOLM && ref.Source != "",
+			IsOCI:             isOCI,
+			IsKustomize:       isKustomize,
+			Tag:               ref.Tag,
+			Path:              ref.Path,
+			IsOLM:             isOLM,
+			InstallFile:       ref.InstallFile,
+			ResourcesFile:     ref.ResourcesFile,
+			ResourcesFileName: resourcesFileName,
+			Service:           service,
 		})
 	}
 
@@ -389,6 +453,79 @@ type undeployTemplateData struct {
 	BundlerVersion     string
 	ComponentsReversed []ComponentData
 	Namespaces         []string // unique namespaces in reverse-deployment order
+}
+
+// subscribeTemplateData is the template data for subscribe.sh generation.
+type subscribeTemplateData struct {
+	BundlerVersion string
+	OLMComponents  []ComponentData
+}
+
+// unsubscribeTemplateData is the template data for unsubscribe.sh generation.
+type unsubscribeTemplateData struct {
+	BundlerVersion string
+	OLMComponents  []ComponentData
+}
+
+// generateSubscribeScript creates the subscribe.sh script for OLM components.
+func (g *Generator) generateSubscribeScript(ctx context.Context, olmComponents []ComponentData, outputDir string) (string, int64, error) {
+	if err := ctx.Err(); err != nil {
+		return "", 0, err
+	}
+
+	data := subscribeTemplateData{
+		BundlerVersion: g.Version,
+		OLMComponents:  olmComponents,
+	}
+
+	subscribePath, subscribeSize, err := deployer.GenerateFromTemplate(subscribeScriptTemplate, data, outputDir, "subscribe.sh")
+	if err != nil {
+		return "", 0, err
+	}
+
+	// Make executable
+	if err := os.Chmod(subscribePath, 0755); err != nil {
+		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set subscribe.sh permissions", err)
+	}
+
+	return subscribePath, subscribeSize, nil
+}
+
+// generateUnsubscribeScript creates the unsubscribe.sh script for OLM components.
+func (g *Generator) generateUnsubscribeScript(ctx context.Context, olmComponents []ComponentData, outputDir string) (string, int64, error) {
+	if err := ctx.Err(); err != nil {
+		return "", 0, err
+	}
+
+	// Reverse order for uninstall
+	reversed := reverseComponents(olmComponents)
+	data := unsubscribeTemplateData{
+		BundlerVersion: g.Version,
+		OLMComponents:  reversed,
+	}
+
+	unsubscribePath, unsubscribeSize, err := deployer.GenerateFromTemplate(unsubscribeScriptTemplate, data, outputDir, "unsubscribe.sh")
+	if err != nil {
+		return "", 0, err
+	}
+
+	// Make executable
+	if err := os.Chmod(unsubscribePath, 0755); err != nil {
+		return "", 0, errors.Wrap(errors.ErrCodeInternal, "failed to set unsubscribe.sh permissions", err)
+	}
+
+	return unsubscribePath, unsubscribeSize, nil
+}
+
+// filterOLMComponents returns only the OLM components from the list.
+func filterOLMComponents(components []ComponentData) []ComponentData {
+	olmComponents := make([]ComponentData, 0)
+	for _, comp := range components {
+		if comp.IsOLM {
+			olmComponents = append(olmComponents, comp)
+		}
+	}
+	return olmComponents
 }
 
 // reverseComponents returns a reversed copy of the component list (for uninstall order).
