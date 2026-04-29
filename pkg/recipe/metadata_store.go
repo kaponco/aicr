@@ -178,6 +178,12 @@ func loadMetadataStore(ctx context.Context) (*MetadataStore, error) {
 			return
 		}
 
+		// Validate OLM components don't have unsupported fields
+		if err := store.Base.Spec.ValidateOLMComponents(); err != nil {
+			cachedMetadataErr = aicrerrors.Wrap(aicrerrors.ErrCodeInvalidRequest, "base recipe validation failed", err)
+			return
+		}
+
 		cachedMetadataStore = store
 	})
 
@@ -620,6 +626,10 @@ func (s *MetadataStore) mergeOverlayChains(overlays []*RecipeMetadata, mergedSpe
 // finalizeRecipeResult validates, sorts, and builds the final RecipeResult.
 func finalizeRecipeResult(criteria *Criteria, mergedSpec *RecipeMetadataSpec, appliedOverlays []string) (*RecipeResult, error) {
 	if err := mergedSpec.ValidateDependencies(); err != nil {
+		return nil, aicrerrors.Wrap(aicrerrors.ErrCodeInvalidRequest, "merged recipe validation failed", err)
+	}
+
+	if err := mergedSpec.ValidateOLMComponents(); err != nil {
 		return nil, aicrerrors.Wrap(aicrerrors.ErrCodeInvalidRequest, "merged recipe validation failed", err)
 	}
 
