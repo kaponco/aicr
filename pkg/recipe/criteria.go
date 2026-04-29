@@ -224,7 +224,7 @@ func GetCriteriaPlatformTypes() []string {
 // Criteria represents the input parameters for recipe matching.
 // All fields are optional and default to "any" if not specified.
 type Criteria struct {
-	// Service is the Kubernetes service type (eks, gke, aks, oke, kind, lke).
+	// Service is the Kubernetes service type (eks, gke, aks, oke, kind, lke, ocp).
 	Service CriteriaServiceType `json:"service,omitempty" yaml:"service,omitempty"`
 
 	// Accelerator is the GPU/accelerator type (h100, gb200, b200, a100, l40, rtx-pro-6000).

@@ -271,7 +271,7 @@ aicr recipe \
 
 | Criteria | Extracted From | Valid Values |
 |----------|---------------|--------------|
-| service | K8s.node.provider / K8s.server.version | eks, gke, aks, oke, kind, lke |
+| service | K8s.node.provider / K8s.server.version | eks, gke, aks, oke, kind, lke, ocp |
 | accelerator | GPU.smi.gpu.model | h100, gb200, b200, a100, l40, rtx-pro-6000 |
 | os | OS.release.ID | ubuntu, rhel, cos, amazonlinux |
 | intent | User-specified | training, inference |
