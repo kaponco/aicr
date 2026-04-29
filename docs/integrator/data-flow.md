@@ -183,7 +183,7 @@ Snapshot → Query Extractor → Recipe Query
 
 ```
 K8s/server/version          → k8s (version)
-K8s/image/gpu-operator      → service (eks/gke/aks detection)
+K8s/image/gpu-operator      → service (eks/gke/aks/ocp detection)
 K8s/config/*                → intent hints
 OS/release/ID               → os (family)
 OS/release/VERSION_ID       → osv (version)
@@ -898,7 +898,7 @@ X-RateLimit-Reset: 1735650000
 
 **Query Parameters:**
 - Type checking (string, int, bool)
-- Enum validation (eks, gke, aks, etc.)
+- Enum validation (eks, gke, aks, ocp, etc.)
 - Version format validation (regex)
 - Range validation (if applicable)
 

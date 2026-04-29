@@ -29,11 +29,18 @@
 #     defaultSource:     Git repository or OCI reference
 #     defaultPath:       Path within the repository to the kustomization
 #     defaultTag:        Git tag, branch, or commit
+#   olm:               Default OLM (Operator Lifecycle Manager) settings (for OLM components)
+#     defaultNamespace:  Default Kubernetes namespace for the operator
+#     installFile:       Path to OLM installation manifest (Subscription, OperatorGroup, etc.)
+#     kinds:             Kubernetes kinds (CRDs) this operator manages (e.g., ["ClusterPolicy"])
 #   testTier:          Optional override for component test tier detection
 #                      (scheduling, deploy, or gpu-aware). Used by tools/component-test/.
 #   nodeScheduling:    Paths in Helm values where node selectors/tolerations are injected
 #
-# Note: A component must have either 'helm' OR 'kustomize' configuration, not both.
+# Note: A component must have either 'helm', 'kustomize', OR 'olm' configuration.
+# Some components (nfd, gpu-operator, network-operator) define both 'helm' and 'olm'
+# to support both standard K8s and OpenShift deployments. Overlays select the appropriate type.
+# For OLM components, resourcesFile is specified in overlays (e.g., recipes/overlays/ocp.yaml).
 # Node scheduling paths define WHERE CLI flags like --system-node-selector are applied.
 # The actual values come from CLI flags, not from this file.
 #
@@ -51,6 +58,11 @@ components:
       defaultRepository: https://kubernetes-sigs.github.io/node-feature-discovery/charts
       defaultChart: node-feature-discovery
       defaultNamespace: node-feature-discovery
+    olm:
+      defaultNamespace: openshift-nfd
+      installFile: components/nfd/olm/install.yaml
+      kinds:
+        - NodeFeatureDiscovery
     nodeScheduling:
       system:
         nodeSelectorPaths:
@@ -58,7 +70,7 @@ components:
           - gc.nodeSelector
         tolerationPaths:
           - master.tolerations
-          - gc.tolerations
+          - gc.tolerations# OLM-specific
           # Worker also inherits system tolerations — the DaemonSet must
           # run on tainted system nodes (not just GPU nodes) to publish
           # hardware features cluster-wide.
@@ -84,6 +96,11 @@ components:
       defaultRepository: https://helm.ngc.nvidia.com/nvidia
       defaultChart: nvidia/gpu-operator
       defaultNamespace: gpu-operator
+    olm:
+      defaultNamespace: gpu-operator
+      installFile: components/gpu-operator/olm/install.yaml
+      kinds:
+        - ClusterPolicy
     nodeScheduling:
       system:
         nodeSelectorPaths:
@@ -106,6 +123,11 @@ components:
       defaultRepository: https://helm.ngc.nvidia.com/nvidia
       defaultChart: nvidia/network-operator
       defaultNamespace: nvidia-network-operator
+    olm:
+      defaultNamespace: nvidia-network-operator
+      installFile: components/network-operator/olm/install.yaml
+      kinds:
+        - NicClusterPolicy
     nodeScheduling:
       system:
         nodeSelectorPaths:

@@ -42,6 +42,7 @@ type ComponentType string
 const (
 	ComponentTypeHelm      ComponentType = "Helm"
 	ComponentTypeKustomize ComponentType = "Kustomize"
+	ComponentTypeOLM       ComponentType = "OLM"
 )
 
 // Constraint represents a deployment constraint/assumption.

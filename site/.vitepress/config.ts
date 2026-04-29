@@ -85,6 +85,7 @@ export default withMermaid(
               { text: 'AKS GPU Setup', link: '/docs/integrator/aks-gpu-setup' },
               { text: 'EKS Dynamo Networking', link: '/docs/integrator/eks-dynamo-networking' },
               { text: 'GKE TCPXO Networking', link: '/docs/integrator/gke-tcpxo-networking' },
+              { text: 'OpenShift Deployment', link: '/docs/integrator/openshift' },
               { text: 'Recipe Development', link: '/docs/integrator/recipe-development' },
               { text: 'Validator Extension', link: '/docs/integrator/validator-extension' },
             ],

@@ -48,14 +48,22 @@ const criteriaAny = "any"
 // templates: README.md's component table and deploy.sh / undeploy.sh
 // name-matched special-case blocks.
 type ComponentData struct {
-	Name       string
-	Namespace  string
-	Repository string
-	ChartName  string
-	Version    string // Original version string (preserves 'v' prefix) for helm install --version
-	IsOCI      bool
-	Tag        string // Git ref for Kustomize-typed components (tag/branch/commit)
-	Path       string // Path within the repository to the kustomization
+	Name           string
+	Namespace      string
+	Repository     string
+	ChartName      string
+	Version        string // Original version string (preserves 'v' prefix) for helm install --version
+	ChartVersion   string // Normalized version (no 'v' prefix) for chart metadata labels
+	HasManifests   bool
+	HasChart       bool
+	IsOCI          bool
+	IsKustomize    bool   // True when the component uses Kustomize instead of Helm
+	Tag            string // Git ref for Kustomize components (tag, branch, or commit)
+	Path           string // Path within the repository to the kustomization
+	IsOLM          bool   // True when the component uses OLM (Operator Lifecycle Manager)
+	InstallFile    string // Path to OLM install file (Subscription, OperatorGroup, etc.)
+	ResourcesFile  string // Path to custom resources file
+	Service        string // Service type (eks, gke, aks, ocp, etc.)
 }
 
 // compile-time interface check
