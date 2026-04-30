@@ -88,10 +88,6 @@ The recipe will include OpenShift-specific component references with OLM deploym
     installFiles:
       - components/gpu-operator/olm/install.yaml
     resourcesFile: components/gpu-operator/resources/resources-ocp.yaml
-    kinds:
-      - ClusterPolicy
-    customResources:
-      - components/gpu-operator/resources/resources-ocp.yaml
 ...
 ```
 
