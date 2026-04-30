@@ -96,11 +96,14 @@ spec:
         enabled: false
 
   # Validation configuration for OCP deployments
+  # Note: OLM manages operator versioning, so version constraints are not needed
   validation:
     deployment:
       checks:
-        - operator-health
-        - expected-resources
-      constraints:
-        - name: Deployment.gpu-operator.version
-          value: ">= v24.6.0"
+        - operator-health        # Verify GPU operator pods are running
+        - expected-resources     # Verify K8s resources exist and are healthy
+        - check-nvidia-smi       # Verify nvidia-smi works on all GPU nodes
+    conformance:
+      checks:
+        - accelerator-metrics    # Verify DCGM exporter metrics are exposed
+        - gpu-operator-health    # Comprehensive GPU operator health diagnostics
