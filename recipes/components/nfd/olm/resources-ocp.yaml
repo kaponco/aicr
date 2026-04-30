@@ -22,7 +22,9 @@ spec:
   instance: ''
   operand:
     # image: to get the image run and copy here (if nul leave empty):
-    #   oc get csv -n node-feature-discovery -o json | jq -r '.items[0].metadata.annotations["alm-examples"]' | tr -d '\000-\037' | jq -r '.[] | select(.kind == "NodeFeatureDiscovery") | .spec.operand.image'
+    #   oc get csv -n node-feature-discovery -o json | \
+    #     jq -r '.items[0].metadata.annotations["alm-examples"]' | tr -d '\000-\037' | \
+    #     jq -r '.[] | select(.kind == "NodeFeatureDiscovery") | .spec.operand.image'
     servicePort: 12000
   prunerOnDelete: false
   topologyUpdater: false

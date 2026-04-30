@@ -186,14 +186,18 @@ func parseBundleCmdOptions(cmd *cli.Command) (*bundleCmdOptions, error) {
 		return nil, errors.Wrap(errors.ErrCodeInvalidRequest, "invalid --accelerated-node-selector", err)
 	}
 
-	// Parse tolerations
-	opts.systemNodeTolerations, err = snapshotter.ParseTolerations(cmd.StringSlice("system-node-toleration"))
-	if err != nil {
-		return nil, errors.Wrap(errors.ErrCodeInvalidRequest, "invalid --system-node-toleration", err)
+	// Parse tolerations (only if explicitly provided - no defaults for bundle command)
+	if systemTolStr := cmd.StringSlice("system-node-toleration"); len(systemTolStr) > 0 {
+		opts.systemNodeTolerations, err = snapshotter.ParseTolerations(systemTolStr)
+		if err != nil {
+			return nil, errors.Wrap(errors.ErrCodeInvalidRequest, "invalid --system-node-toleration", err)
+		}
 	}
-	opts.acceleratedNodeTolerations, err = snapshotter.ParseTolerations(cmd.StringSlice("accelerated-node-toleration"))
-	if err != nil {
-		return nil, errors.Wrap(errors.ErrCodeInvalidRequest, "invalid --accelerated-node-toleration", err)
+	if accelTolStr := cmd.StringSlice("accelerated-node-toleration"); len(accelTolStr) > 0 {
+		opts.acceleratedNodeTolerations, err = snapshotter.ParseTolerations(accelTolStr)
+		if err != nil {
+			return nil, errors.Wrap(errors.ErrCodeInvalidRequest, "invalid --accelerated-node-toleration", err)
+		}
 	}
 
 	// Parse workload-gate taint

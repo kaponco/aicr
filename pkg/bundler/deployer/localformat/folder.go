@@ -24,6 +24,9 @@ const (
 	// KindLocalHelm: folder contains a generated Chart.yaml + templates/;
 	// install.sh installs ./ as a local chart.
 	KindLocalHelm
+	// KindOLM: folder contains OLM install files (Subscription, OperatorGroup)
+	// and custom resources; no Helm chart or values files.
+	KindOLM
 )
 
 // String returns the stable textual name for the kind. Used by logs and
@@ -34,6 +37,8 @@ func (k FolderKind) String() string {
 		return "upstream-helm"
 	case KindLocalHelm:
 		return "local-helm"
+	case KindOLM:
+		return "olm"
 	default:
 		return "unknown"
 	}

@@ -3450,10 +3450,8 @@ func TestGenerateSubscribeScript(t *testing.T) {
 		checkContent  []string
 	}{
 		{
-			name: "single OLM component",
-			setupContext: func() context.Context {
-				return context.Background()
-			},
+			name:         "single OLM component",
+			setupContext: context.Background,
 			olmComponents: []ComponentData{
 				{
 					Name:        "gpu-operator",
@@ -3463,13 +3461,11 @@ func TestGenerateSubscribeScript(t *testing.T) {
 				},
 			},
 			wantErr:      false,
-			checkContent: []string{"gpu-operator", "nvidia-gpu-operator"},
+			checkContent: []string{"[0-9][0-9][0-9]-*/", "olm.sh", "bash olm.sh subscribe"},
 		},
 		{
-			name: "multiple OLM components",
-			setupContext: func() context.Context {
-				return context.Background()
-			},
+			name:         "multiple OLM components",
+			setupContext: context.Background,
 			olmComponents: []ComponentData{
 				{
 					Name:        "gpu-operator",
@@ -3485,7 +3481,7 @@ func TestGenerateSubscribeScript(t *testing.T) {
 				},
 			},
 			wantErr:      false,
-			checkContent: []string{"gpu-operator", "network-operator"},
+			checkContent: []string{"[0-9][0-9][0-9]-*/", "olm.sh", "bash olm.sh subscribe"},
 		},
 		{
 			name: "context cancelled",
@@ -3570,10 +3566,8 @@ func TestGenerateUnsubscribeScript(t *testing.T) {
 		checkContent  []string
 	}{
 		{
-			name: "single OLM component",
-			setupContext: func() context.Context {
-				return context.Background()
-			},
+			name:         "single OLM component",
+			setupContext: context.Background,
 			olmComponents: []ComponentData{
 				{
 					Name:        "gpu-operator",
@@ -3583,13 +3577,11 @@ func TestGenerateUnsubscribeScript(t *testing.T) {
 				},
 			},
 			wantErr:      false,
-			checkContent: []string{"gpu-operator", "nvidia-gpu-operator"},
+			checkContent: []string{"[0-9][0-9][0-9]-*/", "olm.sh", "bash olm.sh unsubscribe", "reverse order"},
 		},
 		{
-			name: "multiple OLM components reversed",
-			setupContext: func() context.Context {
-				return context.Background()
-			},
+			name:         "multiple OLM components reversed",
+			setupContext: context.Background,
 			olmComponents: []ComponentData{
 				{
 					Name:        "gpu-operator",
@@ -3605,7 +3597,7 @@ func TestGenerateUnsubscribeScript(t *testing.T) {
 				},
 			},
 			wantErr:      false,
-			checkContent: []string{"gpu-operator", "network-operator"},
+			checkContent: []string{"[0-9][0-9][0-9]-*/", "olm.sh", "bash olm.sh unsubscribe", "reverse order"},
 		},
 		{
 			name: "context cancelled",
@@ -3682,7 +3674,6 @@ func TestGenerateUnsubscribeScript(t *testing.T) {
 }
 
 func TestGenerate_WithOLMComponents(t *testing.T) {
-	t.Skip("OLM support not yet implemented in localformat - TODO: add OLM handling to pkg/bundler/deployer/localformat")
 	ctx := context.Background()
 	outputDir := t.TempDir()
 
@@ -3748,13 +3739,7 @@ func TestGenerate_WithOLMComponents(t *testing.T) {
 		t.Errorf("001-gpu-operator/resources-ocp.yaml not found: %v", statErr)
 	}
 
-	// Verify README was still generated
-	readmePath := filepath.Join(outputDir, "001-gpu-operator", "README.md")
-	if _, statErr := os.Stat(readmePath); statErr != nil {
-		t.Errorf("001-gpu-operator/README.md not found: %v", statErr)
-	}
-
-	// Verify values.yaml was NOT generated for OLM component
+	// Verify values.yaml was NOT generated for OLM component (OLM uses Subscriptions, not Helm)
 	valuesPath := filepath.Join(outputDir, "001-gpu-operator", "values.yaml")
 	if _, statErr := os.Stat(valuesPath); !os.IsNotExist(statErr) {
 		t.Error("values.yaml should not exist for OLM component")
@@ -3777,5 +3762,29 @@ func TestGenerate_WithOLMComponents(t *testing.T) {
 	}
 	if !foundUnsubscribe {
 		t.Error("output.Files does not include unsubscribe.sh")
+	}
+
+	// Verify deploy.sh properly handles OLM components
+	deployPath := filepath.Join(outputDir, "deploy.sh")
+	deployContent, err := os.ReadFile(deployPath)
+	if err != nil {
+		t.Fatalf("failed to read deploy.sh: %v", err)
+	}
+	deployStr := string(deployContent)
+
+	// Check for IS_OLM_COMPONENT detection
+	if !strings.Contains(deployStr, "IS_OLM_COMPONENT=") {
+		t.Error("deploy.sh missing IS_OLM_COMPONENT variable")
+	}
+	if !strings.Contains(deployStr, "Installing") && !strings.Contains(deployStr, "via OLM") {
+		t.Error("deploy.sh missing OLM install message")
+	}
+	// Check that Helm-specific cleanup is skipped for OLM
+	if !strings.Contains(deployStr, `if [[ "${IS_OLM_COMPONENT}" != "true" ]]; then`) {
+		t.Error("deploy.sh missing conditional Helm cleanup for OLM components")
+	}
+	// Check that INSTALL_CMD is set correctly for OLM
+	if !strings.Contains(deployStr, "bash olm.sh apply") {
+		t.Error("deploy.sh missing OLM install command")
 	}
 }

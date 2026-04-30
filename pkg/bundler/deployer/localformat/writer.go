@@ -41,6 +41,10 @@ type Component struct {
 	// Kustomize (empty for helm components)
 	Tag  string
 	Path string
+	// OLM (Operator Lifecycle Manager) - empty for Helm/Kustomize components
+	IsOLM         bool   // True when using OLM instead of Helm
+	InstallFile   string // Path to OLM install file (Subscription, OperatorGroup, etc.)
+	ResourcesFile string // Path to custom resources file
 	// Values hydrated by the component bundler
 	Values       map[string]any
 	DynamicPaths []string // paths moved from values.yaml into cluster-values.yaml
@@ -79,6 +83,8 @@ func renderInputFor(c Component) manifest.RenderInput {
 // component folders that the deployer's loop would later install. Top-level
 // orchestration files (deploy.sh, undeploy.sh, README.md, attestation/) are
 // left intact; only files under [0-9][0-9][0-9]-* are removed.
+//
+//nolint:funlen // Orchestrator function handling multiple component types
 func Write(ctx context.Context, opts Options) ([]Folder, error) {
 	// Honor cancellation before any filesystem mutation.
 	if err := ctx.Err(); err != nil {
@@ -220,6 +226,14 @@ func Write(ctx context.Context, opts Options) ([]Folder, error) {
 			folders = append(folders, f)
 			slog.Info("wrote local chart folder", "index", idx, "dir", dir, "kind", kind.String(), "parent", c.Name)
 			idx++
+		case KindOLM:
+			f, err := writeOLMFolder(opts.OutputDir, dir, idx, c)
+			if err != nil {
+				return nil, err
+			}
+			folders = append(folders, f)
+			slog.Info("wrote OLM folder", "index", idx, "dir", dir, "kind", kind.String(), "parent", c.Name)
+			idx++
 		}
 	}
 	return folders, nil
@@ -257,6 +271,9 @@ func splitDynamicPaths(values map[string]any, dynamicPaths []string) valueSplit 
 
 // classify determines the primary folder kind for a component.
 func classify(c Component, manifests map[string][]byte) FolderKind {
+	if c.IsOLM {
+		return KindOLM
+	}
 	if c.Tag != "" || c.Path != "" {
 		// Kustomize-typed — Task 9 adds actual kustomize build support.
 		return KindLocalHelm
