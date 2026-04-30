@@ -1636,4 +1636,3 @@ func TestMake_ArgoCDDeployerAllowsNonOLM(t *testing.T) {
 		t.Fatal("Make() returned nil output")
 	}
 }
-

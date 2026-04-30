@@ -59,8 +59,8 @@ components:
       defaultVersion: "0.18.3"
       defaultNamespace: node-feature-discovery
     olm:
-      defaultNamespace: node-feature-discovery
       installFile: components/nfd/olm/install.yaml
+      defaultNamespace: openshift-nfd
     nodeScheduling:
       system:
         nodeSelectorPaths:

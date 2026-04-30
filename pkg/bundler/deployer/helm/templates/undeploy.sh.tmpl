@@ -24,6 +24,11 @@ set -euo pipefail
 #   --timeout SECONDS   Timeout for helm uninstall and kubectl delete operations
 #   --skip-preflight    Skip pre-flight finalizer checks (use with caution)
 #
+# NOTE: For OLM (Operator Lifecycle Manager) components:
+#   - This script only deletes custom resources (CR instances)
+#   - Operators remain running to avoid breaking other components
+#   - To uninstall operators, run ./unsubscribe.sh after this script
+#
 # This script is optional — components can be removed manually with helm uninstall.
 # For detailed behavior docs (PVC preservation, namespace ordering, stuck release
 # handling), see the AICR CLI Reference:
@@ -469,22 +474,33 @@ for dir in $(ls -1d "${SCRIPT_DIR}"/[0-9][0-9][0-9]-*/ 2>/dev/null | sort -r); d
     continue
   fi
   echo "Uninstalling ${name} (${ns})..."
-  # For local-helm folders (Chart.yaml + templates/), kubectl-delete the
-  # rendered templates BEFORE helm uninstall. The templates may carry
-  # helm.sh/hook annotations (post-install/post-upgrade) which helm does
-  # not track or clean up on uninstall — so without this pre-delete, the
-  # operator gets removed but its hook-created CRs (and their finalizers)
-  # linger. Doing the delete while the controller is still running lets
-  # finalizers clear naturally.
-  if [[ -d "${dir}/templates" ]]; then
-    for tpl in "${dir}/templates/"*.yaml; do
-      [[ -f "${tpl}" ]] || continue
-      kubectl delete -n "${ns}" -f "${tpl}" --ignore-not-found --timeout="${HELM_TIMEOUT}s" || true
-    done
+
+  # Check if this is an OLM component (has olm.sh for Subscription/OperatorGroup)
+  if [[ -f "${dir}/olm.sh" ]]; then
+    # OLM component: delete custom resources only (operators stay running)
+    # Use olm.sh delete to remove resources
+    echo "  OLM component: deleting custom resources..."
+    ( cd "${dir}" && bash olm.sh delete ) || echo "  Warning: failed to delete ${name} resources" >&2
+    # Note: Operators are NOT uninstalled here. Use ./unsubscribe.sh to remove operators.
+  else
+    # Helm component: standard helm uninstall flow
+    # For local-helm folders (Chart.yaml + templates/), kubectl-delete the
+    # rendered templates BEFORE helm uninstall. The templates may carry
+    # helm.sh/hook annotations (post-install/post-upgrade) which helm does
+    # not track or clean up on uninstall — so without this pre-delete, the
+    # operator gets removed but its hook-created CRs (and their finalizers)
+    # linger. Doing the delete while the controller is still running lets
+    # finalizers clear naturally.
+    if [[ -d "${dir}/templates" ]]; then
+      for tpl in "${dir}/templates/"*.yaml; do
+        [[ -f "${tpl}" ]] || continue
+        kubectl delete -n "${ns}" -f "${tpl}" --ignore-not-found --timeout="${HELM_TIMEOUT}s" || true
+      done
+    fi
+    helm_force_uninstall "${name}" "${ns}"
+    delete_release_cluster_resources "${name}" "${ns}"
+    delete_orphaned_webhooks_for_ns "${ns}"
   fi
-  helm_force_uninstall "${name}" "${ns}"
-  delete_release_cluster_resources "${name}" "${ns}"
-  delete_orphaned_webhooks_for_ns "${ns}"
 done
 
 # Remove nodewright node taints that persist after operator removal.
@@ -673,6 +689,22 @@ if [[ "${postflight_issues}" == "true" ]]; then
   echo "Post-flight: some stale resources remain. Run deploy.sh pre-flight checks to verify before redeploying."
 else
   echo "Post-flight: cluster is clean."
+fi
+
+# Check if there are OLM components and remind user about unsubscribe.sh
+HAS_OLM=false
+for dir in "${SCRIPT_DIR}"/[0-9][0-9][0-9]-*/; do
+  [[ -d "${dir}" ]] || continue
+  if [[ -f "${dir}/olm.sh" ]]; then
+    HAS_OLM=true
+    break
+  fi
+done
+
+if [[ "${HAS_OLM}" == "true" ]]; then
+  echo ""
+  echo "NOTE: OLM operators are still running (only custom resources were deleted)."
+  echo "      To uninstall the operators, run: ./unsubscribe.sh"
 fi
 
 echo "Undeployment complete."

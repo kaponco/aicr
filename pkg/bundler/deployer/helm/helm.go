@@ -326,16 +326,19 @@ func toLocalformatComponents(
 	out := make([]localformat.Component, 0, len(components))
 	for _, c := range components {
 		out = append(out, localformat.Component{
-			Name:         c.Name,
-			Namespace:    c.Namespace,
-			Repository:   c.Repository,
-			ChartName:    c.ChartName,
-			Version:      c.Version,
-			IsOCI:        c.IsOCI,
-			Tag:          c.Tag,
-			Path:         c.Path,
-			Values:       values[c.Name],
-			DynamicPaths: dynamic[c.Name],
+			Name:          c.Name,
+			Namespace:     c.Namespace,
+			Repository:    c.Repository,
+			ChartName:     c.ChartName,
+			Version:       c.Version,
+			IsOCI:         c.IsOCI,
+			Tag:           c.Tag,
+			Path:          c.Path,
+			IsOLM:         c.IsOLM,
+			InstallFile:   c.InstallFile,
+			ResourcesFile: c.ResourcesFile,
+			Values:        values[c.Name],
+			DynamicPaths:  dynamic[c.Name],
 		})
 	}
 	return out

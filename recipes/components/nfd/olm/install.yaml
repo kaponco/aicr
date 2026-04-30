@@ -28,6 +28,6 @@ metadata:
   name: nfd
 spec:
   # NOTE: targetNamespaces must match the namespace this is deployed to.
-  # This is the AICR project nfd ns. Edit if using a custom namespace.
+  # Using openshift-nfd to align with Red Hat's suggested namespace for the NFD operator.
   targetNamespaces:
-  - node-feature-discovery
+  - openshift-nfd

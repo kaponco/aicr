@@ -293,13 +293,22 @@ for dir in "${SCRIPT_DIR}"/[0-9][0-9][0-9]-*/; do
   dir="${dir%/}"
   base="${dir##*/}"
   name="${base#[0-9][0-9][0-9]-}"
-  # Source the namespace from the folder's install.sh — not the folder
-  # basename — because the helm release name and its target namespace can
-  # differ (e.g. nodewright-operator → namespace skyhook; gpu-operator-post →
-  # namespace gpu-operator). cleanup_helm_hooks and the kai diagnostics
-  # both operate on the namespace.
-  namespace=$(awk '{ for (i=1;i<NF;i++) if ($i=="--namespace") { print $(i+1); exit } }' "${dir}/install.sh")
-  echo "Installing ${name} (${base}) into namespace ${namespace}..."
+
+  # Determine if this is an OLM component (has olm.sh for Subscription/OperatorGroup)
+  IS_OLM_COMPONENT=false
+  if [[ -f "${dir}/olm.sh" ]]; then
+    IS_OLM_COMPONENT=true
+    namespace="${name}"  # OLM components manage their own namespace internally
+    echo "Installing ${name} (${base}) via OLM..."
+  else
+    # Source the namespace from the folder's install.sh — not the folder
+    # basename — because the helm release name and its target namespace can
+    # differ (e.g. nodewright-operator → namespace skyhook; gpu-operator-post →
+    # namespace gpu-operator). cleanup_helm_hooks and the kai diagnostics
+    # both operate on the namespace.
+    namespace=$(awk '{ for (i=1;i<NF;i++) if ($i=="--namespace") { print $(i+1); exit } }' "${dir}/install.sh")
+    echo "Installing ${name} (${base}) into namespace ${namespace}..."
+  fi
 
   # Derive wait args: global --wait/--no-wait behavior + per-component timeout.
   COMPONENT_HELM_TIMEOUT="${HELM_TIMEOUT}"
@@ -322,21 +331,33 @@ for dir in "${SCRIPT_DIR}"/[0-9][0-9][0-9]-*/; do
   fi
   export COMPONENT_WAIT_ARGS
 
-  # Invoke the per-folder install.sh with retry. On failure, dump kai-scheduler
-  # diagnostics and clean up stale Helm hook Jobs between attempts.
+  # Set install command based on component type
+  if [[ "${IS_OLM_COMPONENT}" == "true" ]]; then
+    INSTALL_CMD="bash olm.sh apply"
+  else
+    INSTALL_CMD="bash install.sh"
+  fi
+
+  # Invoke the per-folder install script with retry. For Helm components, on failure
+  # dump kai-scheduler diagnostics and clean up stale Helm hook Jobs between attempts.
+  # OLM components don't use Helm hooks, so skip those cleanup steps.
   attempt=0
   while true; do
-    if ( cd "${dir}" && bash install.sh ); then
+    if ( cd "${dir}" && ${INSTALL_CMD} ); then
       break
     fi
     attempt=$((attempt + 1))
-    dump_kai_scheduler_helm_diagnostics "${namespace}"
+    if [[ "${IS_OLM_COMPONENT}" != "true" ]]; then
+      dump_kai_scheduler_helm_diagnostics "${namespace}"
+    fi
     if [[ ${attempt} -gt ${COMPONENT_MAX_RETRIES} ]]; then
       echo "ERROR: ${name} install failed after ${attempt} attempts"
       helm_failed "${name}"
       break
     fi
-    cleanup_helm_hooks "${namespace}"
+    if [[ "${IS_OLM_COMPONENT}" != "true" ]]; then
+      cleanup_helm_hooks "${namespace}"
+    fi
     wait_secs=$(backoff_seconds "${attempt}")
     echo "RETRY: ${name} install failed (attempt ${attempt}/${COMPONENT_MAX_RETRIES}), retrying in ${wait_secs}s..."
     sleep "${wait_secs}"
