@@ -53,8 +53,8 @@ func TestWrite_OLM(t *testing.T) {
 	// Verify files exist
 	for _, rel := range []string{"olm.sh", "install.yaml", "resources-ocp.yaml"} {
 		path := filepath.Join(outDir, "001-gpu-operator", rel)
-		if _, err := os.Stat(path); err != nil {
-			t.Errorf("missing file %s: %v", rel, err)
+		if _, statErr := os.Stat(path); statErr != nil {
+			t.Errorf("missing file %s: %v", rel, statErr)
 		}
 	}
 
@@ -239,8 +239,8 @@ func TestWrite_OLMWithoutResourcesFile(t *testing.T) {
 
 	// Should have olm.sh and install.yaml but no resources file
 	for _, file := range []string{"olm.sh", "install.yaml"} {
-		if _, err := os.Stat(filepath.Join(outDir, "001-gpu-operator", file)); err != nil {
-			t.Errorf("missing %s: %v", file, err)
+		if _, statErr := os.Stat(filepath.Join(outDir, "001-gpu-operator", file)); statErr != nil {
+			t.Errorf("missing %s: %v", file, statErr)
 		}
 	}
 
