@@ -173,8 +173,10 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name: "gpu-operator",
-						Type: ComponentTypeOLM,
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
 						Overrides: map[string]any{
 							"enabled": false,
 						},
@@ -188,9 +190,11 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name:  "gpu-operator",
-						Type:  ComponentTypeOLM,
-						Chart: "nvidia/gpu-operator",
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
+						Chart:       "nvidia/gpu-operator",
 					},
 				},
 			},
@@ -202,9 +206,11 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name:       "gpu-operator",
-						Type:       ComponentTypeOLM,
-						ValuesFile: "components/gpu-operator/values.yaml",
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
+						ValuesFile:  "components/gpu-operator/values.yaml",
 					},
 				},
 			},
@@ -216,9 +222,11 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name: "gpu-operator",
-						Type: ComponentTypeOLM,
-						Tag:  "v1.0.0",
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
+						Tag:         "v1.0.0",
 					},
 				},
 			},
@@ -230,9 +238,11 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name: "gpu-operator",
-						Type: ComponentTypeOLM,
-						Path: "deploy/production",
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
+						Path:        "deploy/production",
 					},
 				},
 			},
@@ -244,9 +254,11 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name:    "gpu-operator",
-						Type:    ComponentTypeOLM,
-						Patches: []string{"patch.yaml"},
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
+						Patches:     []string{"patch.yaml"},
 					},
 				},
 			},
@@ -258,8 +270,10 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name: "gpu-operator",
-						Type: ComponentTypeOLM,
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
 						Overrides: map[string]any{
 							"driver": map[string]any{
 								"version": "570.86.16",
@@ -276,8 +290,10 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name: "gpu-operator",
-						Type: ComponentTypeOLM,
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
 						Overrides: map[string]any{
 							"enabled": true,
 							"driver": map[string]any{
@@ -295,8 +311,10 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name: "gpu-operator",
-						Type: ComponentTypeOLM,
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
 					},
 					{
 						Name:       "cert-manager",
@@ -312,13 +330,17 @@ func TestRecipeMetadataSpecValidateOLMComponents(t *testing.T) {
 			spec: RecipeMetadataSpec{
 				ComponentRefs: []ComponentRef{
 					{
-						Name: "nfd",
-						Type: ComponentTypeOLM,
+						Name:        "nfd",
+						Type:        ComponentTypeOLM,
+						Namespace:   "openshift-nfd",
+						InstallFile: "components/nfd/olm/install.yaml",
 					},
 					{
-						Name:  "gpu-operator",
-						Type:  ComponentTypeOLM,
-						Chart: "nvidia/gpu-operator",
+						Name:        "gpu-operator",
+						Type:        ComponentTypeOLM,
+						Namespace:   "gpu-operator",
+						InstallFile: "components/gpu-operator/olm/install.yaml",
+						Chart:       "nvidia/gpu-operator",
 					},
 				},
 			},

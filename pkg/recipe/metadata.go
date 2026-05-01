@@ -664,6 +664,7 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 			result.ValuesFile = ""
 			result.Source = ""
 			result.Version = ""
+			result.ManifestFiles = nil
 			// Clear Kustomize-specific fields
 			result.Tag = ""
 			result.Path = ""

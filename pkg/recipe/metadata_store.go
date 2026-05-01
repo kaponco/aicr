@@ -629,16 +629,17 @@ func finalizeRecipeResult(criteria *Criteria, mergedSpec *RecipeMetadataSpec, ap
 		return nil, aicrerrors.Wrap(aicrerrors.ErrCodeInvalidRequest, "merged recipe validation failed", err)
 	}
 
-	if err := mergedSpec.ValidateOLMComponents(); err != nil {
-		return nil, aicrerrors.Wrap(aicrerrors.ErrCodeInvalidRequest, "merged recipe validation failed", err)
-	}
-
 	deployOrder, err := mergedSpec.TopologicalSort()
 	if err != nil {
 		return nil, aicrerrors.Wrap(aicrerrors.ErrCodeInternal, "failed to compute deployment order", err)
 	}
 
 	applyRegistryDefaults(mergedSpec.ComponentRefs)
+
+	// Validate OLM components after applying registry defaults
+	if err := mergedSpec.ValidateOLMComponents(); err != nil {
+		return nil, aicrerrors.Wrap(aicrerrors.ErrCodeInvalidRequest, "merged recipe validation failed", err)
+	}
 
 	result := &RecipeResult{
 		Kind:            RecipeResultKind,
