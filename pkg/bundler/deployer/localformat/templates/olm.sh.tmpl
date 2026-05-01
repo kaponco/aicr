@@ -80,7 +80,7 @@ case "${MODE}" in
 {{- end }}
 
     # Get CSV name before deleting subscription
-    CSV_NAME=$(oc get -f install.yaml --namespace {{ .Namespace }} -o jsonpath='{.items[?(@.kind=="Subscription")].status.currentCSV}' 2>/dev/null || echo "")
+    CSV_NAME=$(oc get -f install.yaml --namespace {{ .Namespace }} ${KUBECONFIG_FLAG:-} -o jsonpath='{.items[?(@.kind=="Subscription")].status.currentCSV}' 2>/dev/null || echo "")
 
     # Delete subscription and operator group
     echo "Deleting {{ .Name }} subscription"

@@ -1051,7 +1051,8 @@ func (b *DefaultBundler) validateOLMComponentFlags(recipeResult *recipe.RecipeRe
 
 	registry, err := recipe.GetComponentRegistry()
 	if err != nil {
-		return nil
+		return errors.Wrap(errors.ErrCodeInternal,
+			"load component registry for OLM flag validation", err)
 	}
 
 	for _, ref := range recipeResult.ComponentRefs {
@@ -1061,7 +1062,8 @@ func (b *DefaultBundler) validateOLMComponentFlags(recipeResult *recipe.RecipeRe
 
 		comp := registry.Get(ref.Name)
 		if comp == nil {
-			continue
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("OLM component %q not found in component registry", ref.Name))
 		}
 
 		// Check --set overrides (except "enabled")

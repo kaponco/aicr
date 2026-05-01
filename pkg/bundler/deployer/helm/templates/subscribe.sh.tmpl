@@ -46,10 +46,14 @@ echo "==> OLM Operator Subscriptions Installation Complete"
 echo ""
 echo "Next steps:"
 echo "  1. Wait for operators to be ready:"
-echo "     kubectl wait --for=jsonpath='{.status.phase}'=Succeeded csv --all-namespaces --all --timeout=5m"
+{{- range .OLMComponents }}
+echo "     oc wait --namespace {{ .Namespace }} --for=jsonpath='{.status.phase}'=Succeeded csv --all --timeout=5m"
+{{- end }}
 echo ""
 echo "  2. Verify operators are installed:"
-echo "     kubectl get csv --all-namespaces"
+{{- range .OLMComponents }}
+echo "     oc get csv --namespace {{ .Namespace }}"
+{{- end }}
 echo ""
 echo "  3. Deploy custom resources:"
 echo "     ./deploy.sh"

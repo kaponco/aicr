@@ -85,9 +85,8 @@ The recipe will include OpenShift-specific component references with OLM deploym
       - nfd
     manifestFiles:
       - components/gpu-operator/manifests/dcgm-exporter.yaml
-    installFiles:
-      - components/gpu-operator/olm/install.yaml
-    resourcesFile: components/gpu-operator/resources/resources-ocp.yaml
+    installFile: components/gpu-operator/olm/install.yaml
+    resourcesFile: components/gpu-operator/olm/resources-ocp.yaml
 ...
 ```
 
@@ -124,14 +123,12 @@ ocp-bundle/
 ├── deploy.sh                   # Step 2: Deploy custom resources
 ├── undeploy.sh                 # Cleanup script
 ├── unsubscribe.sh              # OLM cleanup script
-├── gpu-operator/
-│   ├── install.yaml       # Subscription + OperatorGroup
-│   ├── resources.yaml         # ClusterPolicy CR
-│   └── README.md
-└── network-operator/
-    ├── install.yaml       # Subscription + OperatorGroup
-    ├── resources.yaml         # NicClusterPolicy CR
-    └── README.md
+├── 001-gpu-operator/
+│   ├── olm.sh                  # OLM deployment script
+│   └── resources-ocp.yaml      # ClusterPolicy CR
+└── 002-network-operator/
+    ├── olm.sh                  # OLM deployment script
+    └── resources-ocp.yaml      # NicClusterPolicy CR
 ```
 
 ### 3. Deploy OLM Subscriptions
@@ -263,10 +260,10 @@ aicr validate \
 [cli] readiness constraint passed: name=K8s.server.version expected=>= 1.30 actual=v1.31.14
 [cli] running validation phase: phase=deployment catalog=4 selected=2
 [cli] running validator: name=operator-health phase=deployment
-[cli] validator completed: name=operator-health status=failed
+[cli] validator completed: name=operator-health status=passed
 [cli] running validator: name=expected-resources phase=deployment
-[cli] validator completed: name=expected-resources status=failed
-[cli] phase completed: phase=deployment status=failed validators=2 passed=0 failed=2 duration=9.394830125s
+[cli] validator completed: name=expected-resources status=passed
+[cli] phase completed: phase=deployment status=passed validators=2 passed=2 failed=0 duration=9.394830125s
 [cli] all phases completed: runID=20260426-140901-4bd0bb84477d9a70 phases=1
 
 === Validation Results ===

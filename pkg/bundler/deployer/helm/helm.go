@@ -228,8 +228,18 @@ func (g *Generator) Generate(ctx context.Context, outputDir string) (*deployer.O
 	// Populate deployment steps for CLI output
 	output.DeploymentSteps = []string{
 		fmt.Sprintf("cd %s", outputDir),
-		"chmod +x deploy.sh",
-		"./deploy.sh",
+	}
+	if len(olmComponents) > 0 {
+		output.DeploymentSteps = append(output.DeploymentSteps,
+			"chmod +x subscribe.sh deploy.sh",
+			"./subscribe.sh",
+			"./deploy.sh",
+		)
+	} else {
+		output.DeploymentSteps = append(output.DeploymentSteps,
+			"chmod +x deploy.sh",
+			"./deploy.sh",
+		)
 	}
 
 	slog.Debug("helm bundle generated",
