@@ -421,12 +421,14 @@ else
     exit 1
   fi
   {{ range .ComponentsReversed -}}
+  {{- if not .IsOLM }}
   if skip_preflight_for_release "{{ .Name }}"; then
     echo "  Skipping {{ .Name }} ({{ .Namespace }}): bundle deletes dependent manifests before controller uninstall."
   else
     echo "  Checking {{ .Name }} ({{ .Namespace }})..."
     check_release_for_stuck_crds "{{ .Name }}" "{{ .Namespace }}"
   fi
+  {{- end }}
   {{ end }}
   if [[ -s "${PREFLIGHT_DETAILS}" ]]; then
     echo ""
@@ -533,6 +535,7 @@ done
 # Clean up orphaned CRDs that were owned by this bundle's releases.
 # Only delete CRDs whose Helm release annotation matches a component we just uninstalled.
 {{- range .ComponentsReversed }}
+{{- if not .IsOLM }}
 kubectl get crd -o json 2>/dev/null \
   | jq -r --arg rel "{{ .Name }}" --arg ns "{{ .Namespace }}" \
     '.items[] | select(.metadata.annotations["meta.helm.sh/release-name"]==$rel and .metadata.annotations["meta.helm.sh/release-namespace"]==$ns) | .metadata.name' 2>/dev/null \
@@ -541,6 +544,7 @@ kubectl get crd -o json 2>/dev/null \
       kubectl delete crd "${name}" --ignore-not-found --wait=false \
         || echo "Warning: failed to delete CRD ${name} (owned by {{ .Name }}/{{ .Namespace }}); leftovers will surface in post-flight" >&2
     done || echo "Warning: orphan-CRD cleanup for {{ .Name }}/{{ .Namespace }} failed (kubectl get / jq error); leftovers will surface in post-flight" >&2
+{{- end }}
 {{- end }}
 
 # Intentionally skip automatic deletion of unannotated CRDs matched only by
@@ -647,6 +651,7 @@ postflight_all_crds_json=""
 if capture_kubectl_json postflight_all_crds_json get crd -o json; then
   :
 {{- range .ComponentsReversed }}
+{{- if not .IsOLM }}
   remaining_helm_crds=$(echo "${postflight_all_crds_json}" \
     | jq -r --arg rel "{{ .Name }}" --arg ns "{{ .Namespace }}" \
       '.items[] | select(.metadata.annotations["meta.helm.sh/release-name"]==$rel and .metadata.annotations["meta.helm.sh/release-namespace"]==$ns and .metadata.deletionTimestamp==null) | .metadata.name' 2>/dev/null || true)
@@ -654,7 +659,9 @@ if capture_kubectl_json postflight_all_crds_json get crd -o json; then
     helm_orphaned_crds="${helm_orphaned_crds} ${remaining_helm_crds}"
   fi
 {{- end }}
+{{- end }}
 {{- range .ComponentsReversed }}
+{{- if not .IsOLM }}
   while read -r crd_name; do
     [[ -z "${crd_name}" ]] && continue
     remaining_explicit_crd=$(echo "${postflight_all_crds_json}" \
@@ -664,6 +671,7 @@ if capture_kubectl_json postflight_all_crds_json get crd -o json; then
       explicit_orphaned_crds="${explicit_orphaned_crds}${remaining_explicit_crd}"$'\n'
     fi
   done < <(extra_crds_for_release "{{ .Name }}")
+{{- end }}
 {{- end }}
 else
   echo "Warning: failed to enumerate post-flight CRDs; kubectl output: ${postflight_all_crds_json}" >&2

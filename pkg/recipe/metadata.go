@@ -772,6 +772,16 @@ func (s *RecipeMetadataSpec) ValidateOLMComponents() error {
 			continue
 		}
 
+		// Check for required OLM fields
+		if c.Namespace == "" {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("OLM component %q must have 'namespace' field", c.Name))
+		}
+		if c.InstallFile == "" {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("OLM component %q must have 'installFile' field", c.Name))
+		}
+
 		// Check for Helm-specific fields
 		if c.Chart != "" {
 			return errors.New(errors.ErrCodeInvalidRequest,

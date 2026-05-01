@@ -119,8 +119,7 @@ func writeOLMFolder(outputDir, dir string, index int, c Component) (Folder, erro
 		ResourcesFileName: resourcesFileName,
 	}
 	if err := renderTemplateToFile(olmScriptTmpl, data, folderPath, "olm.sh", 0755); err != nil {
-		return Folder{}, errors.Wrap(errors.ErrCodeInternal,
-			fmt.Sprintf("render olm.sh for %s", c.Name), err)
+		return Folder{}, err
 	}
 	files = append(files, filepath.Join(dir, "olm.sh"))
 

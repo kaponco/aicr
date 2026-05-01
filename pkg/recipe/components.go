@@ -389,18 +389,23 @@ func (c *ComponentConfig) GetValidations() []ComponentValidationConfig {
 }
 
 // GetType returns the component deployment type based on which config is present.
-// Returns ComponentTypeOLM if OLM.InstallFile is set,
-// ComponentTypeKustomize if Kustomize.DefaultSource is set,
+// Returns ComponentTypeKustomize if Kustomize.DefaultSource is set,
+// ComponentTypeOLM if OLM.InstallFile is set and no Helm config exists,
 // otherwise returns ComponentTypeHelm (the default).
+// When both Helm and OLM configs are present, Helm is preferred.
 func (c *ComponentConfig) GetType() ComponentType {
 	if c == nil {
 		return ComponentTypeHelm
 	}
-	if c.OLM.InstallFile != "" {
-		return ComponentTypeOLM
-	}
+	// Check for Kustomize first
 	if c.Kustomize.DefaultSource != "" {
 		return ComponentTypeKustomize
+	}
+	// Check if Helm config is present
+	hasHelm := c.Helm.DefaultRepository != "" || c.Helm.DefaultChart != "" || c.Helm.DefaultNamespace != ""
+	// Only return OLM if OLM config exists and no Helm config
+	if c.OLM.InstallFile != "" && !hasHelm {
+		return ComponentTypeOLM
 	}
 	return ComponentTypeHelm
 }

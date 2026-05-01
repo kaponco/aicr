@@ -149,6 +149,14 @@ func Write(ctx context.Context, opts Options) ([]Folder, error) {
 				fmt.Sprintf("component %q has both kustomize (Tag/Path) and raw manifests; use one", c.Name))
 		}
 
+		// Reject OLM components with kustomize or raw manifest inputs.
+		// OLM components use static manifests (installFile, resourcesFile) and
+		// cannot include kustomize (Tag/Path) or raw manifests.
+		if c.IsOLM && (c.Tag != "" || c.Path != "" || len(opts.ComponentManifests[c.Name]) > 0) {
+			return nil, errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("component %q marked as OLM must not include kustomize (Tag/Path) or raw manifests", c.Name))
+		}
+
 		kind := classify(c, opts.ComponentManifests[c.Name])
 		dir := fmt.Sprintf("%03d-%s", idx, c.Name)
 
