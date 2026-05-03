@@ -298,8 +298,10 @@ for dir in "${SCRIPT_DIR}"/[0-9][0-9][0-9]-*/; do
   IS_OLM_COMPONENT=false
   if [[ -f "${dir}/olm.sh" ]]; then
     IS_OLM_COMPONENT=true
-    namespace="${name}"  # OLM components manage their own namespace internally
     echo "Installing ${name} (${base}) via OLM..."
+    # Note: OLM components do not use the namespace variable — all namespace logic
+    # is handled internally by olm.sh. Helm hooks and kai diagnostics are skipped
+    # for OLM (IS_OLM_COMPONENT guards below).
   else
     # Source the namespace from the folder's install.sh — not the folder
     # basename — because the helm release name and its target namespace can

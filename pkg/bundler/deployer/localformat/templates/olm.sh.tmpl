@@ -17,6 +17,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
+# Environment variables:
+# - KUBECONFIG_FLAG: Optional oc flag (e.g., "--kubeconfig /path"). Must be pre-tokenized.
+# - DRY_RUN_FLAG: Optional oc flag (e.g., "--dry-run=server"). Must be pre-tokenized.
+
 # OLM olm.sh requires a mode parameter
 if [[ $# -eq 0 ]]; then
   echo "Error: Missing required parameter"
@@ -37,11 +41,11 @@ case "${MODE}" in
 
     # Create namespace
     echo "Creating namespace {{ .Namespace }}"
-    oc create namespace {{ .Namespace }} --dry-run=client -o yaml | oc apply -f - ${KUBECONFIG_FLAG:-}
+    oc create namespace "{{ .Namespace }}" --dry-run=client -o yaml | oc apply -f - ${KUBECONFIG_FLAG:-}
 
     # Apply subscription manifests
     echo "Applying install.yaml"
-    oc apply --namespace {{ .Namespace }} -f install.yaml ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
+    oc apply --namespace "{{ .Namespace }}" -f install.yaml ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
 
     echo "✓ {{ .Name }} operator subscription installed"
     ;;
@@ -51,7 +55,7 @@ case "${MODE}" in
     # Note: Operator must be installed first via 'olm.sh subscribe'
 {{- if .ResourcesFile }}
     echo "Applying {{ .Name }} custom resources"
-    oc apply --namespace {{ .Namespace }} -f {{ .ResourcesFileName }} ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
+    oc apply --namespace "{{ .Namespace }}" -f {{ .ResourcesFileName }} ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
     echo "✓ {{ .Name }} resources applied"
 {{- else }}
     echo "No custom resources to apply for {{ .Name }}"
@@ -62,7 +66,7 @@ case "${MODE}" in
     # Delete custom resources
 {{- if .ResourcesFile }}
     echo "Deleting {{ .Name }} custom resources"
-    oc delete --namespace {{ .Namespace }} -f {{ .ResourcesFileName }} --ignore-not-found --timeout=60s ${KUBECONFIG_FLAG:-}
+    oc delete --namespace "{{ .Namespace }}" -f {{ .ResourcesFileName }} --ignore-not-found --timeout=60s ${KUBECONFIG_FLAG:-}
     echo "✓ {{ .Name }} resources deleted"
 {{- else }}
     echo "No custom resources to delete for {{ .Name }}"
@@ -76,20 +80,23 @@ case "${MODE}" in
 {{- if .ResourcesFile }}
     # Delete custom resources first
     echo "Deleting {{ .Name }} custom resources"
-    oc delete --namespace {{ .Namespace }} -f {{ .ResourcesFileName }} --ignore-not-found --timeout=60s ${KUBECONFIG_FLAG:-}
+    oc delete --namespace "{{ .Namespace }}" -f {{ .ResourcesFileName }} --ignore-not-found --timeout=60s ${KUBECONFIG_FLAG:-}
 {{- end }}
 
     # Get CSV name before deleting subscription
-    CSV_NAME=$(oc get -f install.yaml --namespace {{ .Namespace }} ${KUBECONFIG_FLAG:-} -o jsonpath='{.items[?(@.kind=="Subscription")].status.currentCSV}' 2>/dev/null || echo "")
+    CSV_NAME=$(oc get -f install.yaml --namespace "{{ .Namespace }}" ${KUBECONFIG_FLAG:-} -o jsonpath='{.items[?(@.kind=="Subscription")].status.currentCSV}' 2>/dev/null || echo "")
 
     # Delete subscription and operator group
     echo "Deleting {{ .Name }} subscription"
-    oc delete --namespace {{ .Namespace }} -f install.yaml --ignore-not-found ${KUBECONFIG_FLAG:-}
+    oc delete --namespace "{{ .Namespace }}" -f install.yaml --ignore-not-found ${KUBECONFIG_FLAG:-}
 
     # Delete CSV if found
     if [ -n "$CSV_NAME" ]; then
       echo "Deleting CSV $CSV_NAME"
-      oc delete csv "$CSV_NAME" --namespace {{ .Namespace }} --ignore-not-found --timeout=60s ${KUBECONFIG_FLAG:-}
+      oc delete csv "$CSV_NAME" --namespace "{{ .Namespace }}" --ignore-not-found --timeout=60s ${KUBECONFIG_FLAG:-}
+    else
+      echo "Warning: No CSV found in Subscription status (operator may still be installing)"
+      echo "Manual cleanup may be required: oc get csv -n {{ .Namespace }}"
     fi
 
     echo "✓ {{ .Name }} operator uninstalled"
