@@ -121,11 +121,18 @@ ocp-bundle/
 ├── deploy.sh                   # Step 2: Deploy custom resources
 ├── undeploy.sh                 # Cleanup script
 ├── unsubscribe.sh              # OLM cleanup script
-├── 001-gpu-operator/
+├── README.md                   # Bundle documentation
+├── recipe.yaml                 # Recipe used to generate bundle
+├── checksums.txt               # SHA256 checksums for all files
+├── 001-nfd/
+│   ├── install.yaml            # Subscription/OperatorGroup manifests
+│   ├── resources-ocp.yaml      # NodeFeatureDiscovery CR
+│   └── olm.sh                  # OLM deployment script
+├── 002-gpu-operator/
 │   ├── install.yaml            # Subscription/OperatorGroup manifests
 │   ├── resources-ocp.yaml      # ClusterPolicy CR
 │   └── olm.sh                  # OLM deployment script
-└── 002-network-operator/
+└── 003-network-operator/
     ├── install.yaml            # Subscription/OperatorGroup manifests
     ├── resources-ocp.yaml      # NicClusterPolicy CR
     └── olm.sh                  # OLM deployment script
