@@ -30,3 +30,4 @@ spec:
   # NOTE: targetNamespaces must match the namespace this is deployed to. Default ns is gpu-operator
   targetNamespaces:
   - gpu-operator
+  

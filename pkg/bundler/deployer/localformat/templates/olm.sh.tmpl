@@ -66,7 +66,7 @@ case "${MODE}" in
     # Delete custom resources
 {{- if .ResourcesFile }}
     echo "Deleting {{ .Name }} custom resources"
-    oc delete --namespace "{{ .Namespace }}" -f {{ .ResourcesFileName }} --ignore-not-found --timeout=60s ${KUBECONFIG_FLAG:-}
+    oc delete --namespace "{{ .Namespace }}" -f {{ .ResourcesFileName }} --ignore-not-found --timeout=60s ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
     echo "✓ {{ .Name }} resources deleted"
 {{- else }}
     echo "No custom resources to delete for {{ .Name }}"
@@ -80,7 +80,7 @@ case "${MODE}" in
 {{- if .ResourcesFile }}
     # Delete custom resources first
     echo "Deleting {{ .Name }} custom resources"
-    oc delete --namespace "{{ .Namespace }}" -f {{ .ResourcesFileName }} --ignore-not-found --timeout=60s ${KUBECONFIG_FLAG:-}
+    oc delete --namespace "{{ .Namespace }}" -f {{ .ResourcesFileName }} --ignore-not-found --timeout=60s ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
 {{- end }}
 
     # Get CSV name before deleting subscription
@@ -88,12 +88,12 @@ case "${MODE}" in
 
     # Delete subscription and operator group
     echo "Deleting {{ .Name }} subscription"
-    oc delete --namespace "{{ .Namespace }}" -f install.yaml --ignore-not-found ${KUBECONFIG_FLAG:-}
+    oc delete --namespace "{{ .Namespace }}" -f install.yaml --ignore-not-found ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
 
     # Delete CSV if found
     if [ -n "$CSV_NAME" ]; then
       echo "Deleting CSV $CSV_NAME"
-      oc delete csv "$CSV_NAME" --namespace "{{ .Namespace }}" --ignore-not-found --timeout=60s ${KUBECONFIG_FLAG:-}
+      oc delete csv "$CSV_NAME" --namespace "{{ .Namespace }}" --ignore-not-found --timeout=60s ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
     else
       echo "Warning: No CSV found in Subscription status (operator may still be installing)"
       echo "Manual cleanup may be required: oc get csv -n {{ .Namespace }}"
