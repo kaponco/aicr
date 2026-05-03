@@ -752,6 +752,57 @@ func TestMergeComponentRef_AdvancedFields(t *testing.T) {
 			t.Error("cleanup should be true when overlay sets it")
 		}
 	})
+
+	t.Run("type conversion Helm to OLM clears Helm fields", func(t *testing.T) {
+		// Simulate base component with Helm type and full registry defaults applied
+		base := ComponentRef{
+			Name:       "gpu-operator",
+			Type:       ComponentTypeHelm,
+			Chart:      "gpu-operator",
+			Source:     "https://helm.ngc.nvidia.com/nvidia",
+			Version:    "v24.9.0",
+			ValuesFile: "components/gpu-operator/values.yaml",
+			Namespace:  "gpu-operator",
+		}
+
+		// Overlay flips to OLM type with only installFile set
+		overlay := ComponentRef{
+			Name:        "gpu-operator",
+			Type:        ComponentTypeOLM,
+			InstallFile: "components/gpu-operator/olm/install.yaml",
+		}
+
+		result := mergeComponentRef(base, overlay)
+
+		// Verify type changed to OLM
+		if result.Type != ComponentTypeOLM {
+			t.Errorf("type = %q, want %q", result.Type, ComponentTypeOLM)
+		}
+
+		// Verify OLM-specific field is set
+		if result.InstallFile != "components/gpu-operator/olm/install.yaml" {
+			t.Errorf("installFile = %q, want components/gpu-operator/olm/install.yaml", result.InstallFile)
+		}
+
+		// Verify Helm-specific fields are cleared (prevent leak from registry defaults)
+		if result.Chart != "" {
+			t.Errorf("chart = %q, want empty (should be cleared on type conversion)", result.Chart)
+		}
+		if result.Source != "" {
+			t.Errorf("source = %q, want empty (should be cleared on type conversion)", result.Source)
+		}
+		if result.Version != "" {
+			t.Errorf("version = %q, want empty (should be cleared on type conversion)", result.Version)
+		}
+		if result.ValuesFile != "" {
+			t.Errorf("valuesFile = %q, want empty (should be cleared on type conversion)", result.ValuesFile)
+		}
+
+		// Verify namespace is inherited (not Helm-specific)
+		if result.Namespace != "gpu-operator" {
+			t.Errorf("namespace = %q, want gpu-operator (should be inherited)", result.Namespace)
+		}
+	})
 }
 
 func TestMergeValidationConfig(t *testing.T) {

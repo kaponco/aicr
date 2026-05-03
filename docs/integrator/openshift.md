@@ -83,8 +83,6 @@ The recipe will include OpenShift-specific component references with OLM deploym
     type: OLM
     dependencyRefs:
       - nfd
-    manifestFiles:
-      - components/gpu-operator/manifests/dcgm-exporter.yaml
     installFile: components/gpu-operator/olm/install.yaml
     resourcesFile: components/gpu-operator/olm/resources-ocp.yaml
 ...
@@ -124,11 +122,13 @@ ocp-bundle/
 ├── undeploy.sh                 # Cleanup script
 ├── unsubscribe.sh              # OLM cleanup script
 ├── 001-gpu-operator/
-│   ├── olm.sh                  # OLM deployment script
-│   └── resources-ocp.yaml      # ClusterPolicy CR
+│   ├── install.yaml            # Subscription/OperatorGroup manifests
+│   ├── resources-ocp.yaml      # ClusterPolicy CR
+│   └── olm.sh                  # OLM deployment script
 └── 002-network-operator/
-    ├── olm.sh                  # OLM deployment script
-    └── resources-ocp.yaml      # NicClusterPolicy CR
+    ├── install.yaml            # Subscription/OperatorGroup manifests
+    ├── resources-ocp.yaml      # NicClusterPolicy CR
+    └── olm.sh                  # OLM deployment script
 ```
 
 ### 3. Deploy OLM Subscriptions

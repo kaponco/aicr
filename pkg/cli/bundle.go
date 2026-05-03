@@ -187,6 +187,8 @@ func parseBundleCmdOptions(cmd *cli.Command) (*bundleCmdOptions, error) {
 	}
 
 	// Parse tolerations (only if explicitly provided - no defaults for bundle command)
+	// This prevents default tolerations from triggering OLM component validation errors
+	// (OLM components do not support --system-node-toleration / --accelerated-node-toleration flags).
 	if systemTolStr := cmd.StringSlice("system-node-toleration"); len(systemTolStr) > 0 {
 		opts.systemNodeTolerations, err = snapshotter.ParseTolerations(systemTolStr)
 		if err != nil {

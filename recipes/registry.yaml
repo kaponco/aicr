@@ -67,7 +67,7 @@ components:
           - gc.nodeSelector
         tolerationPaths:
           - master.tolerations
-          - gc.tolerations # OLM-specific
+          - gc.tolerations
           # Worker also inherits system tolerations — the DaemonSet must
           # run on tainted system nodes (not just GPU nodes) to publish
           # hardware features cluster-wide.

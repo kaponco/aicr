@@ -255,6 +255,9 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		if ref.InstallFile == "" && config.OLM.InstallFile != "" {
 			ref.InstallFile = config.OLM.InstallFile
 		}
+		// Note: ResourcesFile is NOT defaulted from registry. Overlays must
+		// explicitly set it (e.g., resources-ocp.yaml) since resource manifests
+		// are deployment-specific, not component-generic.
 	}
 
 	// NOTE: healthCheck.assertFile content is intentionally NOT loaded here.
