@@ -40,8 +40,11 @@ func TestWrite_OLM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Write: %v", err)
 	}
-	if len(folders) != 1 || folders[0].Kind != localformat.KindOLM {
-		t.Fatalf("want 1 OLM folder, got %d folders kind=%v", len(folders), folders[0].Kind)
+	if len(folders) != 1 {
+		t.Fatalf("want 1 OLM folder, got %d", len(folders))
+	}
+	if folders[0].Kind != localformat.KindOLM {
+		t.Fatalf("want OLM folder kind=%v, got %v", localformat.KindOLM, folders[0].Kind)
 	}
 	if folders[0].Dir != "001-gpu-operator" {
 		t.Errorf("folder dir = %q, want 001-gpu-operator", folders[0].Dir)
