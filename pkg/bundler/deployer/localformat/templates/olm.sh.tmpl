@@ -41,7 +41,7 @@ case "${MODE}" in
 
     # Create namespace
     echo "Creating namespace {{ .Namespace }}"
-    oc create namespace "{{ .Namespace }}" --dry-run=client -o yaml | oc apply -f - ${KUBECONFIG_FLAG:-}
+    oc create namespace "{{ .Namespace }}" --dry-run=client -o yaml | oc apply -f - ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
 
     # Apply subscription manifests
     echo "Applying install.yaml"

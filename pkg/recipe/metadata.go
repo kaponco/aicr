@@ -820,6 +820,12 @@ func (s *RecipeMetadataSpec) ValidateOLMComponents() error {
 				fmt.Sprintf("OLM component %q cannot have 'patches' field", c.Name))
 		}
 
+		// Check for raw manifest fields (OLM uses installFile/resourcesFile instead)
+		if len(c.ManifestFiles) > 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("OLM component %q cannot have 'manifestFiles' field", c.Name))
+		}
+
 		// Check for overrides (only "enabled" is allowed)
 		if len(c.Overrides) > 0 {
 			for key := range c.Overrides {
