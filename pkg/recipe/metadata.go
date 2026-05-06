@@ -660,38 +660,43 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 
 	// Clear type-incompatible fields when component type changes
 	if overlay.Type != "" && overlay.Type != base.Type {
-		switch result.Type {
-		case ComponentTypeOLM:
-			// Clear Helm-specific fields
-			result.Chart = ""
-			result.ValuesFile = ""
-			result.Source = ""
-			result.Version = ""
-			result.ManifestFiles = nil
-			// Clear Kustomize-specific fields
-			result.Tag = ""
-			result.Path = ""
-			result.Patches = nil
-		case ComponentTypeHelm:
-			// Clear Kustomize-specific fields
-			result.Tag = ""
-			result.Path = ""
-			result.Patches = nil
-			// Clear OLM-specific fields
-			result.InstallFile = ""
-			result.ResourcesFile = ""
-		case ComponentTypeKustomize:
-			// Clear Helm-specific fields
-			result.Chart = ""
-			result.ValuesFile = ""
-			result.Version = ""
-			// Clear OLM-specific fields
-			result.InstallFile = ""
-			result.ResourcesFile = ""
-		}
+		clearIncompatibleFields(&result)
 	}
 
 	return result
+}
+
+// clearIncompatibleFields removes type-specific fields that don't apply to the current component type.
+func clearIncompatibleFields(ref *ComponentRef) {
+	switch ref.Type {
+	case ComponentTypeOLM:
+		// Clear Helm-specific fields
+		ref.Chart = ""
+		ref.ValuesFile = ""
+		ref.Source = ""
+		ref.Version = ""
+		ref.ManifestFiles = nil
+		// Clear Kustomize-specific fields
+		ref.Tag = ""
+		ref.Path = ""
+		ref.Patches = nil
+	case ComponentTypeHelm:
+		// Clear Kustomize-specific fields
+		ref.Tag = ""
+		ref.Path = ""
+		ref.Patches = nil
+		// Clear OLM-specific fields
+		ref.InstallFile = ""
+		ref.ResourcesFile = ""
+	case ComponentTypeKustomize:
+		// Clear Helm-specific fields
+		ref.Chart = ""
+		ref.ValuesFile = ""
+		ref.Version = ""
+		// Clear OLM-specific fields
+		ref.InstallFile = ""
+		ref.ResourcesFile = ""
+	}
 }
 
 // ValidateDependencies validates that all dependencyRefs reference existing components.
