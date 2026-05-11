@@ -36,11 +36,14 @@ spec:
     # NFD must be installed before GPU Operator
     - name: nfd-olm
       type: Direct
+      namespace: openshift-nfd
+      sourceFile: recipes/components/nfd-olm/direct/olm.yaml
 
     # Node Feature Discovery CR (custom resource configuration)
     # Overrides the Helm-based nfd from base with a Direct CR
     - name: nfd
       type: Direct
+      namespace: openshift-nfd
       sourceFile: recipes/components/nfd/direct/nodefeaturediscovery.yaml
       dependencyRefs:
         - nfd-olm
@@ -49,6 +52,8 @@ spec:
     # This installs the operator; GPU configuration is handled separately
     - name: gpu-operator-olm
       type: Direct
+      namespace: nvidia-gpu-operator
+      sourceFile: recipes/components/gpu-operator-olm/direct/olm.yaml
       dependencyRefs:
         - nfd-olm
 
@@ -57,6 +62,7 @@ spec:
     # The operator itself is installed via OLM (gpu-operator-olm above)
     - name: gpu-operator
       type: Direct
+      namespace: nvidia-gpu-operator
       sourceFile: recipes/components/gpu-operator/direct/clusterpolicy.yaml
       dependencyRefs:
         - gpu-operator-olm

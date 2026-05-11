@@ -486,6 +486,13 @@ func (b *DefaultBundler) extractComponentValues(ctx context.Context, recipeResul
 			return nil, errors.Wrap(errors.ErrCodeTimeout, "context cancelled during component value extraction", err)
 		}
 
+		// Direct components use static YAML manifests and don't need Helm values.
+		// Skip value extraction and processing for them.
+		if ref.Type == recipe.ComponentTypeDirect {
+			componentValues[ref.Name] = make(map[string]any)
+			continue
+		}
+
 		// Get base values from recipe
 		values, err := recipeResult.GetValuesForComponent(ref.Name)
 		if err != nil {

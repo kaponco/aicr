@@ -17,10 +17,5 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
-{{- if .Namespace }}
-# Create namespace if it doesn't exist
-kubectl create namespace {{ .Namespace }} ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-} 2>/dev/null || true
-
-{{- end }}
-# Apply the static YAML manifest using kubectl
-kubectl apply -f {{ .ManifestFilename }} {{- if .Namespace }} -n {{ .Namespace }}{{- end }} ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
+# Delete the static YAML manifest using kubectl
+kubectl delete -f {{ .ManifestFilename }} {{- if .Namespace }} -n {{ .Namespace }}{{- end }} ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-} --ignore-not-found --timeout="${HELM_TIMEOUT:-120}s" || true

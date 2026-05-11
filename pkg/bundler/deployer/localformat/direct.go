@@ -30,6 +30,9 @@ import (
 //go:embed templates/install-direct.sh.tmpl
 var installDirectTemplate string
 
+//go:embed templates/uninstall-direct.sh.tmpl
+var uninstallDirectTemplate string
+
 // writeDirectFolder emits a Direct deployment folder containing:
 //   - Static YAML manifest file (copied from SourceFile)
 //   - install.sh script that runs `kubectl apply -f <manifest> -n <namespace>`
@@ -87,6 +90,17 @@ func writeDirectFolder(outputDir, dir string, idx int, c Component) (Folder, err
 		return Folder{}, err
 	}
 	files = append(files, filepath.Join(dir, "install.sh"))
+
+	// Generate uninstall.sh
+	uninstallTmpl, parseErr := template.New("uninstall-direct.sh").Parse(uninstallDirectTemplate)
+	if parseErr != nil {
+		return Folder{}, errors.Wrap(errors.ErrCodeInternal, "parse uninstall-direct.sh template", parseErr)
+	}
+
+	if err := renderTemplateToFile(uninstallTmpl, data, folderDir, "uninstall.sh", 0o755); err != nil {
+		return Folder{}, err
+	}
+	files = append(files, filepath.Join(dir, "uninstall.sh"))
 
 	return Folder{
 		Index:  idx,
