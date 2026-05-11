@@ -538,6 +538,10 @@ func buildApplicationData(comp recipe.ComponentRef, f localformat.Folder, syncWa
 			data.Version = deployer.NormalizeVersion(comp.Version)
 		}
 		data.Chart = chart
+	case localformat.KindDirect:
+		// Direct components are not supported in ArgoCD deployer.
+		// Direct components use kubectl apply instead of Helm, which doesn't fit
+		// the Argo CD Application resource model. Use the helm deployer instead.
 	}
 	return data
 }

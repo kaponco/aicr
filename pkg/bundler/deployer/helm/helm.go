@@ -56,6 +56,7 @@ type ComponentData struct {
 	IsOCI      bool
 	Tag        string // Git ref for Kustomize-typed components (tag/branch/commit)
 	Path       string // Path within the repository to the kustomization
+	SourceFile string // Path to static YAML file for Direct components
 }
 
 // compile-time interface check
@@ -263,6 +264,7 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 			IsOCI:      strings.HasPrefix(ref.Source, "oci://"),
 			Tag:        ref.Tag,
 			Path:       ref.Path,
+			SourceFile: ref.SourceFile,
 		})
 	}
 
@@ -289,6 +291,7 @@ func toLocalformatComponents(
 			IsOCI:        c.IsOCI,
 			Tag:          c.Tag,
 			Path:         c.Path,
+			SourceFile:   c.SourceFile,
 			Values:       values[c.Name],
 			DynamicPaths: dynamic[c.Name],
 		})

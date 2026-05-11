@@ -41,6 +41,8 @@ type Component struct {
 	// Kustomize (empty for helm components)
 	Tag  string
 	Path string
+	// Direct (static YAML manifests)
+	SourceFile string // path to static YAML file for Direct components
 	// Values hydrated by the component bundler
 	Values       map[string]any
 	DynamicPaths []string // paths moved from values.yaml into cluster-values.yaml
@@ -118,7 +120,7 @@ func renderInputFor(c Component) manifest.RenderInput {
 // one VendorRecord per pulled upstream chart for inclusion in the bundle's
 // provenance.yaml. The records slice is empty when VendorCharts is false.
 //
-//nolint:funlen // single-pass component loop; further extraction reduces locality of the index/branch logic.
+//nolint:funlen // Central orchestrator handling Helm, Kustomize, and Direct components; single-pass component loop.
 func Write(ctx context.Context, opts Options) (WriteResult, error) {
 	// Honor cancellation before any filesystem mutation.
 	if err := ctx.Err(); err != nil {
@@ -294,6 +296,14 @@ func Write(ctx context.Context, opts Options) (WriteResult, error) {
 			folders = append(folders, f)
 			slog.Info("wrote local chart folder", "index", idx, "dir", dir, "kind", kind.String(), "parent", c.Name)
 			idx++
+		case KindDirect:
+			f, err := writeDirectFolder(opts.OutputDir, dir, idx, c)
+			if err != nil {
+				return WriteResult{}, err
+			}
+			folders = append(folders, f)
+			slog.Info("wrote direct folder", "index", idx, "dir", dir, "kind", kind.String(), "parent", c.Name)
+			idx++
 		}
 	}
 	return WriteResult{Folders: folders, VendoredCharts: vendorRecords}, nil
@@ -331,6 +341,10 @@ func splitDynamicPaths(values map[string]any, dynamicPaths []string) valueSplit 
 
 // classify determines the primary folder kind for a component.
 func classify(c Component, manifests map[string][]byte) FolderKind {
+	// Direct components have SourceFile set
+	if c.SourceFile != "" {
+		return KindDirect
+	}
 	if c.Tag != "" || c.Path != "" {
 		// Kustomize-typed — Task 9 adds actual kustomize build support.
 		return KindLocalHelm
