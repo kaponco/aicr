@@ -1,0 +1,51 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ClusterPolicy CR for NVIDIA GPU Operator on OpenShift
+# This configures the GPU operator that was installed via OLM.
+# Reference: https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/install-gpu-ocp.html
+---
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: gpu-cluster-policy
+spec:
+  operator:
+    # OpenShift uses CRI-O as the default container runtime
+    defaultRuntime: crio
+
+  driver:
+    enabled: true
+    # Driver version for OpenShift / RHEL CoreOS
+    version: "550.54.15"
+
+  toolkit:
+    enabled: true
+
+  devicePlugin:
+    enabled: true
+
+  # DCGM exporter for Prometheus metrics
+  dcgmExporter:
+    enabled: true
+    config:
+      name: ""
+
+  # GPU Feature Discovery
+  gfd:
+    enabled: true
+
+  # Node Feature Discovery - disabled because it's deployed as a standalone component
+  nfd:
+    enabled: false

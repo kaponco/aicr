@@ -898,7 +898,7 @@ X-RateLimit-Reset: 1735650000
 
 **Query Parameters:**
 - Type checking (string, int, bool)
-- Enum validation (eks, gke, aks, etc.)
+- Enum validation (eks, gke, aks, ocp, etc.)
 - Version format validation (regex)
 - Range validation (if applicable)
 

@@ -1,0 +1,39 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# NodeFeatureDiscovery CR for NFD configuration on OpenShift
+# This configures the NFD operator that was installed via OLM.
+# Reference: https://docs.openshift.com/container-platform/latest/hardware_enablement/psap-node-feature-discovery-operator.html
+---
+apiVersion: nfd.openshift.io/v1
+kind: NodeFeatureDiscovery
+metadata:
+  name: nfd-instance
+  namespace: openshift-nfd
+spec:
+  operand:
+    image: registry.redhat.io/openshift4/ose-node-feature-discovery:v4.14
+    imagePullPolicy: Always
+  workerConfig:
+    configData: |
+      core:
+        sleepInterval: 60s
+      sources:
+        pci:
+          deviceClassWhitelist:
+            - "0200"
+            - "03"
+            - "12"
+          deviceLabelFields:
+            - "vendor"

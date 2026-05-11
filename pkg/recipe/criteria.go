@@ -49,6 +49,7 @@ const (
 	CriteriaServiceGKE  CriteriaServiceType = "gke"
 	CriteriaServiceAKS  CriteriaServiceType = "aks"
 	CriteriaServiceOKE  CriteriaServiceType = "oke"
+	CriteriaServiceOCP  CriteriaServiceType = "ocp"
 	CriteriaServiceKind CriteriaServiceType = "kind"
 	CriteriaServiceLKE  CriteriaServiceType = "lke"
 )
@@ -66,6 +67,8 @@ func ParseCriteriaServiceType(s string) (CriteriaServiceType, error) {
 		return CriteriaServiceAKS, nil
 	case "oke":
 		return CriteriaServiceOKE, nil
+	case "ocp":
+		return CriteriaServiceOCP, nil
 	case string(CriteriaServiceKind):
 		return CriteriaServiceKind, nil
 	case "lke":
@@ -77,7 +80,7 @@ func ParseCriteriaServiceType(s string) (CriteriaServiceType, error) {
 
 // GetCriteriaServiceTypes returns all supported service types sorted alphabetically.
 func GetCriteriaServiceTypes() []string {
-	return []string{"aks", "eks", "gke", "kind", "lke", "oke"}
+	return []string{"aks", "eks", "gke", "kind", "lke", "ocp", "oke"}
 }
 
 // CriteriaAcceleratorType represents the GPU/accelerator type.

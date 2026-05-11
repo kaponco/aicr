@@ -42,6 +42,7 @@ type ComponentType string
 const (
 	ComponentTypeHelm      ComponentType = "Helm"
 	ComponentTypeKustomize ComponentType = "Kustomize"
+	ComponentTypeDirect    ComponentType = "Direct"
 )
 
 // Constraint represents a deployment constraint/assumption.
@@ -87,6 +88,10 @@ type ComponentRef struct {
 
 	// ValuesFile is the path to the values file (relative to data directory).
 	ValuesFile string `json:"valuesFile,omitempty" yaml:"valuesFile,omitempty"`
+
+	// SourceFile is the path to the source YAML file for Direct components (relative to data directory).
+	// Used by Direct deployment type to specify static Kubernetes manifests.
+	SourceFile string `json:"sourceFile,omitempty" yaml:"sourceFile,omitempty"`
 
 	// Overrides contains inline values that override those from ValuesFile.
 	// Merge order: base values → ValuesFile → Overrides (highest precedence).
@@ -238,6 +243,9 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 		if ref.Path == "" && config.Kustomize.DefaultPath != "" {
 			ref.Path = config.Kustomize.DefaultPath
 		}
+	case ComponentTypeDirect:
+		// Direct components use static YAML manifests embedded in AICR.
+		// No defaults to apply - sourceFile comes from registry config.
 	}
 
 	// NOTE: healthCheck.assertFile content is intentionally NOT loaded here.
@@ -565,6 +573,11 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 	// ValuesFile: overlay takes precedence if set
 	if overlay.ValuesFile != "" {
 		result.ValuesFile = overlay.ValuesFile
+	}
+
+	// SourceFile: overlay takes precedence if set
+	if overlay.SourceFile != "" {
+		result.SourceFile = overlay.SourceFile
 	}
 
 	// Overrides: deep-merge maps, overlay takes precedence

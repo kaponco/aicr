@@ -520,3 +520,17 @@ components:
           - acceleratedNodeSelector
         tolerationPaths:
           - acceleratedTolerations
+
+  - name: gpu-operator-olm
+    displayName: GPU Operator (OLM)
+    valueOverrideKeys:
+      - gpuoperatorolm
+    direct:
+      sourceFile: recipes/components/gpu-operator-olm/direct/olm.yaml
+
+  - name: nfd-olm
+    displayName: Node Feature Discovery (OLM)
+    valueOverrideKeys:
+      - nfdolm
+    direct:
+      sourceFile: recipes/components/nfd-olm/direct/olm.yaml

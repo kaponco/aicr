@@ -262,7 +262,7 @@ Supported content types:
 
 | Parameter | Type | Validation | Example |
 |-----------|------|------------|--------|
-| `service` | ServiceType | Enum: eks, gke, aks, oke, kind, lke, any | `service=eks` |
+| `service` | ServiceType | Enum: eks, gke, aks, oke, ocp, kind, lke, any | `service=eks` |
 | `accelerator` | AcceleratorType | Enum: h100, gb200, b200, a100, l40, rtx-pro-6000, any | `accelerator=h100` |
 | `gpu` | AcceleratorType | Alias for accelerator | `gpu=h100` |
 | `intent` | IntentType | Enum: training, inference, any | `intent=training` |
@@ -277,7 +277,36 @@ Shared with CLI - same logic as described in CLI architecture.
 
 ### Recipe Generation
 
-Endpoints `GET /v1/recipe` (query parameters) and `POST /v1/recipe` (criteria body, `application/json` or `application/x-yaml`). See [Query Parameter Parsing](#query-parameter-parsing) above for the GET parameter table and [POST Request Body Format](#post-request-body-format) above for the body schema.
+**Endpoints**:
+- `GET /v1/recipe` - Generate recipe from query parameters
+- `POST /v1/recipe` - Generate recipe from criteria body
+
+#### GET Method
+
+**Query Parameters**:
+- `service` - Kubernetes service type (eks, gke, aks, oke, ocp, kind, lke)
+- `accelerator` - GPU/accelerator type (h100, gb200, b200, a100, l40, rtx-pro-6000)
+- `gpu` - Alias for accelerator (backwards compatibility)
+- `intent` - Workload intent (training, inference)
+- `os` - Operating system family (ubuntu, rhel, cos, amazonlinux, talos)
+- `nodes` - Number of GPU nodes (0 = any/unspecified)
+
+#### POST Method
+
+**Content Types**: `application/json`, `application/x-yaml`
+
+**Request Body**: `RecipeCriteria` resource with kind, apiVersion, metadata, and spec fields.
+
+```yaml
+kind: RecipeCriteria
+apiVersion: aicr.nvidia.com/v1alpha1
+metadata:
+  name: my-criteria
+spec:
+  service: eks
+  accelerator: h100
+  intent: training
+```
 
 **Response**: 200 OK
 

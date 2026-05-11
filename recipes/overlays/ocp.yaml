@@ -1,0 +1,113 @@
+# Copyright (c) 2026, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+kind: RecipeMetadata
+apiVersion: aicr.nvidia.com/v1alpha1
+metadata:
+  name: ocp
+
+spec:
+  # Inherits from base (implicit when spec.base is empty)
+  # This recipe contains OpenShift-specific settings shared by all OCP deployments
+
+  criteria:
+    service: ocp
+
+  # OpenShift-specific constraints
+  # OpenShift 4.14+ includes Kubernetes 1.27+
+  constraints:
+    - name: K8s.server.version
+      value: ">= 1.27"
+
+  # OpenShift-specific components
+  componentRefs:
+    # Node Feature Discovery installation via OLM
+    # NFD must be installed before GPU Operator
+    - name: nfd-olm
+      type: Direct
+
+    # Node Feature Discovery CR (custom resource configuration)
+    # Overrides the Helm-based nfd from base with a Direct CR
+    - name: nfd
+      type: Direct
+      sourceFile: recipes/components/nfd/direct/nodefeaturediscovery.yaml
+      dependencyRefs:
+        - nfd-olm
+
+    # GPU Operator installation via OLM (OpenShift's native operator installation method)
+    # This installs the operator; GPU configuration is handled separately
+    - name: gpu-operator-olm
+      type: Direct
+      dependencyRefs:
+        - nfd-olm
+
+    # GPU Operator ClusterPolicy CR (custom resource configuration)
+    # Overrides the Helm-based gpu-operator from base with a Direct CR
+    # The operator itself is installed via OLM (gpu-operator-olm above)
+    - name: gpu-operator
+      type: Direct
+      sourceFile: recipes/components/gpu-operator/direct/clusterpolicy.yaml
+      dependencyRefs:
+        - gpu-operator-olm
+        - nfd
+
+    # Disable components from base that are not needed for OpenShift minimal setup
+    - name: cert-manager
+      type: Helm
+      overrides:
+        enabled: false
+
+    - name: kube-prometheus-stack
+      type: Helm
+      overrides:
+        enabled: false
+
+    - name: prometheus-adapter
+      type: Helm
+      overrides:
+        enabled: false
+
+    - name: k8s-ephemeral-storage-metrics
+      type: Helm
+      overrides:
+        enabled: false
+
+    - name: nodewright-operator
+      type: Helm
+      overrides:
+        enabled: false
+
+    - name: nvidia-dra-driver-gpu
+      type: Helm
+      overrides:
+        enabled: false
+
+    - name: nvsentinel
+      type: Helm
+      overrides:
+        enabled: false
+
+    - name: kai-scheduler
+      type: Helm
+      overrides:
+        enabled: false
+
+  validation:
+    conformance:
+      checks:
+        - platform-health
+        - gpu-operator-health
+        - dra-support
+        - accelerator-metrics
+        - ai-service-metrics
