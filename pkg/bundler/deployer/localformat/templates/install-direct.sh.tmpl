@@ -28,8 +28,8 @@ kubectl apply -f {{ .ManifestFilename }} {{- if .Namespace }} -n {{ .Namespace }
 
 # Wait for ClusterServiceVersion to reach Succeeded phase
 echo "Waiting for OLM operator CSV to reach Succeeded phase..."
-TIMEOUT=300
-INTERVAL=5
+TIMEOUT=${AICR_OLM_CSV_TIMEOUT:-{{ .CSVWaitTimeoutSeconds }}}
+INTERVAL=${AICR_OLM_CSV_INTERVAL:-{{ .CSVPollIntervalSeconds }}}
 ELAPSED=0
 
 while [ $ELAPSED -lt $TIMEOUT ]; do

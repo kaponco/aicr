@@ -377,7 +377,25 @@ else
   echo "Deployment complete."
 fi
 echo
-echo "NOTE: The above status reflects Helm install and manifest apply results,"
+{{- $hasHelm := false }}
+{{- $hasDirect := false }}
+{{- $hasOLM := false }}
+{{- range .Components }}
+  {{- if .Repository }}{{ $hasHelm = true }}{{ end }}
+  {{- if .SourceFile }}{{ $hasDirect = true }}{{ end }}
+  {{- if .Olm }}{{ $hasOLM = true }}{{ end }}
+{{- end }}
+{{- if and $hasDirect (not $hasHelm) }}
+  {{- if $hasOLM }}
+echo "NOTE: The above status reflects OLM operator installation and kubectl apply results,"
+  {{- else }}
+echo "NOTE: The above status reflects kubectl apply results,"
+  {{- end }}
+{{- else if and $hasHelm (not $hasDirect) }}
+echo "NOTE: The above status reflects Helm install results,"
+{{- else }}
+echo "NOTE: The above status reflects Helm install and kubectl apply results,"
+{{- end }}
 echo "not whether the cluster is ready for GPU workloads. On fresh"
 echo "GPU nodes, cluster convergence may continue asynchronously after this"
 echo "script exits. Full workload readiness can take additional time for:"

@@ -23,6 +23,7 @@ import (
 	"text/template"
 
 	"github.com/NVIDIA/aicr/pkg/bundler/deployer"
+	"github.com/NVIDIA/aicr/pkg/defaults"
 	"github.com/NVIDIA/aicr/pkg/errors"
 	"github.com/NVIDIA/aicr/pkg/recipe"
 )
@@ -77,15 +78,19 @@ func writeDirectFolder(outputDir, dir string, idx int, c Component) (Folder, err
 	}
 
 	data := struct {
-		ComponentName    string
-		Namespace        string
-		ManifestFilename string
-		Olm              bool
+		ComponentName          string
+		Namespace              string
+		ManifestFilename       string
+		Olm                    bool
+		CSVWaitTimeoutSeconds  int
+		CSVPollIntervalSeconds int
 	}{
-		ComponentName:    c.Name,
-		Namespace:        c.Namespace,
-		ManifestFilename: manifestFilename,
-		Olm:              c.Olm,
+		ComponentName:          c.Name,
+		Namespace:              c.Namespace,
+		ManifestFilename:       manifestFilename,
+		Olm:                    c.Olm,
+		CSVWaitTimeoutSeconds:  int(defaults.OLMCSVWaitTimeout.Seconds()),
+		CSVPollIntervalSeconds: int(defaults.OLMCSVPollInterval.Seconds()),
 	}
 
 	if err := renderTemplateToFile(tmpl, data, folderDir, "install.sh", 0o755); err != nil {

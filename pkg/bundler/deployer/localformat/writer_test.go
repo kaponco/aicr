@@ -327,6 +327,222 @@ func TestWrite_Kustomize(t *testing.T) {
 	}
 }
 
+func TestWrite_DirectWithRealFiles(t *testing.T) {
+	// This test uses actual embedded files from the recipes directory
+	// Testing with real gpu-operator-olm OLM manifest
+	outDir := t.TempDir()
+
+	res, err := localformat.Write(context.Background(), localformat.Options{
+		OutputDir: outDir,
+		Components: []localformat.Component{{
+			Name:       "gpu-operator-olm",
+			Namespace:  "nvidia-gpu-operator",
+			SourceFile: "recipes/components/gpu-operator-olm/direct/olm.yaml",
+			Olm:        true,
+		}},
+	})
+	folders := res.Folders
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if len(folders) != 1 {
+		t.Fatalf("want 1 folder, got %d", len(folders))
+	}
+	if got, want := folders[0].Dir, "001-gpu-operator-olm"; got != want {
+		t.Errorf("folders[0].Dir = %q, want %q", got, want)
+	}
+	if got, want := folders[0].Kind, localformat.KindDirect; got != want {
+		t.Errorf("folders[0].Kind = %v, want %v", got, want)
+	}
+
+	// Verify files written on disk
+	for _, rel := range []string{"install.sh", "uninstall.sh", "olm.yaml"} {
+		path := filepath.Join(outDir, "001-gpu-operator-olm", rel)
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("missing file %s: %v", rel, err)
+		}
+	}
+
+	// Verify install.sh contains OLM CSV wait logic
+	installPath := filepath.Join(outDir, "001-gpu-operator-olm", "install.sh")
+	installContent, err := os.ReadFile(installPath)
+	if err != nil {
+		t.Fatalf("read install.sh: %v", err)
+	}
+	expectedStrings := []string{
+		"kubectl apply",
+		"olm.yaml",
+		"ClusterServiceVersion",
+		"CSV reached Succeeded phase",
+		"TIMEOUT=",
+		"-n nvidia-gpu-operator",
+	}
+	for _, expected := range expectedStrings {
+		if !strings.Contains(string(installContent), expected) {
+			t.Errorf("OLM install.sh missing %q", expected)
+		}
+	}
+
+	// Verify uninstall.sh contains CSV deletion logic
+	uninstallPath := filepath.Join(outDir, "001-gpu-operator-olm", "uninstall.sh")
+	uninstallContent, err := os.ReadFile(uninstallPath)
+	if err != nil {
+		t.Fatalf("read uninstall.sh: %v", err)
+	}
+	if !strings.Contains(string(uninstallContent), "kubectl get csv") {
+		t.Errorf("OLM uninstall.sh should contain CSV deletion logic")
+	}
+	if !strings.Contains(string(uninstallContent), "kubectl delete") {
+		t.Errorf("uninstall.sh should contain kubectl delete")
+	}
+
+	// Verify install.sh is executable
+	installInfo, err := os.Stat(installPath)
+	if err != nil {
+		t.Fatalf("stat install.sh: %v", err)
+	}
+	if installInfo.Mode()&0o111 == 0 {
+		t.Errorf("install.sh should be executable, got mode %v", installInfo.Mode())
+	}
+
+	// Verify manifest content was copied from embedded FS
+	manifestPath := filepath.Join(outDir, "001-gpu-operator-olm", "olm.yaml")
+	manifestContent, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatalf("read olm.yaml: %v", err)
+	}
+	// Verify it contains expected OLM resources
+	manifestStr := string(manifestContent)
+	if !strings.Contains(manifestStr, "kind: OperatorGroup") {
+		t.Errorf("olm.yaml should contain OperatorGroup")
+	}
+	if !strings.Contains(manifestStr, "kind: Subscription") {
+		t.Errorf("olm.yaml should contain Subscription")
+	}
+}
+
+func TestWrite_DirectNonOLM(t *testing.T) {
+	// Test Direct deployment without OLM (no CSV wait logic)
+	outDir := t.TempDir()
+
+	res, err := localformat.Write(context.Background(), localformat.Options{
+		OutputDir: outDir,
+		Components: []localformat.Component{{
+			Name:       "gpu-operator",
+			Namespace:  "nvidia-gpu-operator",
+			SourceFile: "recipes/components/gpu-operator/direct/clusterpolicy.yaml",
+			Olm:        false, // Not an OLM component
+		}},
+	})
+	folders := res.Folders
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if len(folders) != 1 {
+		t.Fatalf("want 1 folder, got %d", len(folders))
+	}
+
+	// Verify install.sh does NOT contain CSV wait logic (not OLM)
+	installPath := filepath.Join(outDir, "001-gpu-operator", "install.sh")
+	installContent, err := os.ReadFile(installPath)
+	if err != nil {
+		t.Fatalf("read install.sh: %v", err)
+	}
+
+	// Should have kubectl apply
+	if !strings.Contains(string(installContent), "kubectl apply") {
+		t.Errorf("install.sh should contain kubectl apply")
+	}
+	if !strings.Contains(string(installContent), "clusterpolicy.yaml") {
+		t.Errorf("install.sh should reference clusterpolicy.yaml")
+	}
+
+	// Should NOT have CSV wait logic (not OLM)
+	if strings.Contains(string(installContent), "ClusterServiceVersion") {
+		t.Errorf("non-OLM install.sh should not contain CSV wait logic")
+	}
+	if strings.Contains(string(installContent), "CSV reached Succeeded") {
+		t.Errorf("non-OLM install.sh should not wait for CSV")
+	}
+}
+
+func TestWrite_DirectMissingSourceFile(t *testing.T) {
+	outDir := t.TempDir()
+
+	_, err := localformat.Write(context.Background(), localformat.Options{
+		OutputDir: outDir,
+		Components: []localformat.Component{{
+			Name:       "missing-file",
+			Namespace:  "test-ns",
+			SourceFile: "recipes/components/nonexistent/direct/manifest.yaml",
+			Olm:        false,
+		}},
+	})
+
+	if err == nil {
+		t.Fatal("Write should fail when source file doesn't exist")
+	}
+	if !stderrors.Is(err, errors.New(errors.ErrCodeInternal, "")) {
+		t.Errorf("expected ErrCodeInternal, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "failed to read source file") {
+		t.Errorf("error should mention failed to read source file, got: %v", err)
+	}
+}
+
+func TestWrite_DirectOLMTimeoutConstants(t *testing.T) {
+	// Verify that timeout constants from pkg/defaults are properly
+	// rendered into the install.sh script with env var override capability
+	outDir := t.TempDir()
+
+	res, err := localformat.Write(context.Background(), localformat.Options{
+		OutputDir: outDir,
+		Components: []localformat.Component{{
+			Name:       "gpu-operator-olm",
+			Namespace:  "nvidia-gpu-operator",
+			SourceFile: "recipes/components/gpu-operator-olm/direct/olm.yaml",
+			Olm:        true,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if len(res.Folders) != 1 {
+		t.Fatalf("want 1 folder, got %d", len(res.Folders))
+	}
+
+	// Read the generated install.sh
+	installPath := filepath.Join(outDir, "001-gpu-operator-olm", "install.sh")
+	installContent, err := os.ReadFile(installPath)
+	if err != nil {
+		t.Fatalf("read install.sh: %v", err)
+	}
+
+	script := string(installContent)
+
+	// Verify timeout uses env var with default from pkg/defaults (300 seconds)
+	if !strings.Contains(script, "TIMEOUT=${AICR_OLM_CSV_TIMEOUT:-300}") {
+		t.Error("install.sh should contain TIMEOUT=${AICR_OLM_CSV_TIMEOUT:-300}")
+	}
+
+	// Verify interval uses env var with default from pkg/defaults (5 seconds)
+	if !strings.Contains(script, "INTERVAL=${AICR_OLM_CSV_INTERVAL:-5}") {
+		t.Error("install.sh should contain INTERVAL=${AICR_OLM_CSV_INTERVAL:-5}")
+	}
+
+	// Verify the timeout logic still exists
+	if !strings.Contains(script, "while [ $ELAPSED -lt $TIMEOUT ]") {
+		t.Error("install.sh should contain timeout loop logic")
+	}
+
+	// Verify CSV wait logic
+	if !strings.Contains(script, "CSV reached Succeeded phase") {
+		t.Error("install.sh should contain CSV success message")
+	}
+}
+
 func TestWrite_Deterministic(t *testing.T) {
 	kustomizePath, err := filepath.Abs(filepath.Join("testdata", "kustomize_input"))
 	if err != nil {

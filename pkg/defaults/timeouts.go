@@ -105,6 +105,23 @@ const (
 	K8sPodTerminationWaitTimeout = 60 * time.Second
 )
 
+// OpenShift OLM deployment timeouts for Direct deployment type install scripts.
+// These constants are rendered into bundle install.sh scripts and can be
+// overridden at deployment time via AICR_OLM_CSV_TIMEOUT and
+// AICR_OLM_CSV_INTERVAL environment variables.
+const (
+	// OLMCSVWaitTimeout is the maximum time to wait for an OLM
+	// ClusterServiceVersion to reach Succeeded phase during operator
+	// installation. Covers catalog resolution, operator image pull,
+	// and initial startup of the operator pod.
+	OLMCSVWaitTimeout = 300 * time.Second
+
+	// OLMCSVPollInterval is the polling interval for checking CSV status
+	// during operator installation. Short enough to provide responsive
+	// feedback without overwhelming the API server.
+	OLMCSVPollInterval = 5 * time.Second
+)
+
 // HTTP client timeouts for outbound requests.
 const (
 	// HTTPClientTimeout is the default total timeout for HTTP requests.

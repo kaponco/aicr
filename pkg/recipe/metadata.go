@@ -74,11 +74,13 @@ type ComponentRef struct {
 	// Chart is the Helm chart name (e.g., "gpu-operator").
 	Chart string `json:"chart,omitempty" yaml:"chart,omitempty"`
 
-	// Type is the deployment type (Helm, Kustomize).
+	// Type is the deployment type (Helm, Kustomize, Direct).
 	Type ComponentType `json:"type" yaml:"type"`
 
 	// Source is the repository URL or OCI reference.
-	Source string `json:"source" yaml:"source"`
+	// Used by Helm (repository URL) and Kustomize (git repository).
+	// Not used by Direct (which uses SourceFile instead).
+	Source string `json:"source,omitempty" yaml:"source,omitempty"`
 
 	// Version is the chart/component version (for Helm).
 	Version string `json:"version,omitempty" yaml:"version,omitempty"`
