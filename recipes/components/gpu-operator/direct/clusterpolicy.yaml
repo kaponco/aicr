@@ -26,7 +26,7 @@ spec:
   driver:
     enabled: true
     rdma:
-      enabled: true
+      enabled: false
       useHostMofed: false
   cdi:
     enabled: true
