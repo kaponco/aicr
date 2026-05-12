@@ -566,8 +566,18 @@ func TestComponentRegistry_Validate_EdgeCases(t *testing.T) {
 	t.Run("valid registry passes", func(t *testing.T) {
 		registry := &ComponentRegistry{
 			Components: []ComponentConfig{
-				{Name: "comp1", DisplayName: "Comp 1", ValueOverrideKeys: []string{"c1"}},
-				{Name: "comp2", DisplayName: "Comp 2", ValueOverrideKeys: []string{"c2"}},
+				{
+					Name:              "comp1",
+					DisplayName:       "Comp 1",
+					ValueOverrideKeys: []string{"c1"},
+					Helm:              HelmConfig{DefaultChart: "comp1"},
+				},
+				{
+					Name:              "comp2",
+					DisplayName:       "Comp 2",
+					ValueOverrideKeys: []string{"c2"},
+					Helm:              HelmConfig{DefaultChart: "comp2"},
+				},
 			},
 		}
 		errs := registry.Validate()
@@ -688,7 +698,7 @@ func TestComponentRegistry_Validate_MutuallyExclusiveHelmKustomize(t *testing.T)
 		}
 		errs := registry.Validate()
 		for _, e := range errs {
-			if strings.Contains(e.Error(), "both helm and kustomize") {
+			if strings.Contains(e.Error(), "multiple deployment type configurations") {
 				t.Errorf("unexpected error for kustomize-only component: %v", e)
 			}
 		}
@@ -713,13 +723,84 @@ func TestComponentRegistry_Validate_MutuallyExclusiveHelmKustomize(t *testing.T)
 		errs := registry.Validate()
 		found := false
 		for _, e := range errs {
-			if strings.Contains(e.Error(), "both helm and kustomize") {
+			if strings.Contains(e.Error(), "multiple deployment type configurations") {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("expected error about both helm and kustomize configuration")
+			t.Error("expected error about multiple deployment type configurations")
+		}
+	})
+
+	t.Run("no deployment type is invalid", func(t *testing.T) {
+		registry := &ComponentRegistry{
+			Components: []ComponentConfig{
+				{
+					Name:        "test-none",
+					DisplayName: "Test None",
+					// No helm, kustomize, or direct configuration
+				},
+			},
+		}
+		errs := registry.Validate()
+		found := false
+		for _, e := range errs {
+			if strings.Contains(e.Error(), "must have exactly one deployment type configuration") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected error about missing deployment type configuration")
+		}
+	})
+
+	t.Run("direct only is valid", func(t *testing.T) {
+		registry := &ComponentRegistry{
+			Components: []ComponentConfig{
+				{
+					Name:        "test-direct",
+					DisplayName: "Test Direct",
+					Direct: DirectConfig{
+						SourceFile: "components/test/direct/olm.yaml",
+					},
+				},
+			},
+		}
+		errs := registry.Validate()
+		for _, e := range errs {
+			if strings.Contains(e.Error(), "multiple deployment type configurations") {
+				t.Errorf("unexpected error for direct-only component: %v", e)
+			}
+		}
+	})
+
+	t.Run("direct and helm is invalid", func(t *testing.T) {
+		registry := &ComponentRegistry{
+			Components: []ComponentConfig{
+				{
+					Name:        "test-direct-helm",
+					DisplayName: "Test Direct and Helm",
+					Helm: HelmConfig{
+						DefaultChart: "example/chart",
+					},
+					Direct: DirectConfig{
+						SourceFile: "components/test/direct/olm.yaml",
+					},
+				},
+			},
+		}
+		errs := registry.Validate()
+		found := false
+		for _, e := range errs {
+			if strings.Contains(e.Error(), "multiple deployment type configurations") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("expected error about multiple deployment type configurations")
 		}
 	})
 }

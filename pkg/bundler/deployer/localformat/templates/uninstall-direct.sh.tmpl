@@ -17,5 +17,15 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
+{{- if .Olm }}
+# For OLM-managed operators, delete the ClusterServiceVersion (CSV) first
+# This removes the actual operator deployment before removing the Subscription
+csv_name=$(kubectl get csv -n {{ .Namespace }} -o name 2>/dev/null | head -1)
+if [[ -n "${csv_name}" ]]; then
+  echo "Deleting ClusterServiceVersion: ${csv_name}"
+  kubectl delete "${csv_name}" -n {{ .Namespace }} --ignore-not-found --timeout="${HELM_TIMEOUT:-120}s" || true
+fi
+
+{{- end }}
 # Delete the static YAML manifest using kubectl
 kubectl delete -f {{ .ManifestFilename }} {{- if .Namespace }} -n {{ .Namespace }}{{- end }} ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-} --ignore-not-found --timeout="${HELM_TIMEOUT:-120}s" || true

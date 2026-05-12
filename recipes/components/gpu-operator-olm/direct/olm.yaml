@@ -16,39 +16,18 @@
 # These manifests install the NVIDIA GPU Operator via OpenShift's Operator Lifecycle Manager (OLM).
 # Reference: https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/install-gpu-ocp.html
 ---
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: nvidia-gpu-operator
----
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: nvidia-gpu-operator-group
-  namespace: nvidia-gpu-operator
 spec:
   targetNamespaces:
   - nvidia-gpu-operator
 ---
 apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: certified-operators
-  namespace: openshift-marketplace
-spec:
-  sourceType: grpc
-  image: registry.redhat.io/redhat/certified-operator-index:v4.14
-  displayName: Certified Operators
-  publisher: Red Hat
-  updateStrategy:
-    registryPoll:
-      interval: 10m
----
-apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: gpu-operator-certified
-  namespace: nvidia-gpu-operator
 spec:
   channel: stable
   name: gpu-operator-certified

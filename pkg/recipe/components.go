@@ -47,11 +47,18 @@ type ComponentConfig struct {
 	// Example: ["gpuoperator"] allows --set gpuoperator:key=value
 	ValueOverrideKeys []string `yaml:"valueOverrideKeys,omitempty"`
 
+	// Olm indicates this component installs an operator via OLM.
+	// When true, the bundler embeds CSV wait logic in install.sh.
+	Olm bool `yaml:"olm,omitempty"`
+
 	// Helm contains default Helm chart settings.
 	Helm HelmConfig `yaml:"helm,omitempty"`
 
 	// Kustomize contains default Kustomize settings.
 	Kustomize KustomizeConfig `yaml:"kustomize,omitempty"`
+
+	// Direct contains settings for Direct deployment type.
+	Direct DirectConfig `yaml:"direct,omitempty"`
 
 	// NodeScheduling defines paths for injecting node selectors and tolerations.
 	NodeScheduling NodeSchedulingConfig `yaml:"nodeScheduling,omitempty"`
@@ -102,6 +109,12 @@ type KustomizeConfig struct {
 
 	// DefaultTag is the default Git tag, branch, or commit.
 	DefaultTag string `yaml:"defaultTag,omitempty"`
+}
+
+// DirectConfig contains settings for Direct deployment type.
+type DirectConfig struct {
+	// SourceFile is the path to the static YAML file (relative to data directory).
+	SourceFile string `yaml:"sourceFile,omitempty"`
 }
 
 // NodeSchedulingConfig defines paths for node scheduling injection.
@@ -302,17 +315,44 @@ func (r *ComponentRegistry) Validate() []error {
 		}
 	}
 
-	// Check for mutually exclusive helm/kustomize configuration
+	// Check for mutually exclusive helm/kustomize/direct configuration
+	// Exactly one deployment type must be configured per component
 	for i, comp := range r.Components {
-		hasHelm := comp.Helm.DefaultRepository != "" || comp.Helm.DefaultChart != ""
-		hasKustomize := comp.Kustomize.DefaultSource != ""
-
-		if hasHelm && hasKustomize {
-			errs = append(errs, errors.New(errors.ErrCodeInvalidRequest, fmt.Sprintf("component[%d] (%s): cannot have both helm and kustomize configuration", i, comp.Name)))
+		if err := validateDeploymentTypeExclusion(comp, i); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
 	return errs
+}
+
+// validateDeploymentTypeExclusion ensures exactly one deployment type is configured.
+// Returns an error if zero or multiple deployment types are set.
+func validateDeploymentTypeExclusion(comp ComponentConfig, index int) error {
+	hasHelm := comp.Helm.DefaultRepository != "" || comp.Helm.DefaultChart != "" || comp.Helm.DefaultNamespace != ""
+	hasKustomize := comp.Kustomize.DefaultSource != ""
+	hasDirect := comp.Direct.SourceFile != ""
+
+	configCount := 0
+	if hasHelm {
+		configCount++
+	}
+	if hasKustomize {
+		configCount++
+	}
+	if hasDirect {
+		configCount++
+	}
+
+	if configCount != 1 {
+		if configCount == 0 {
+			return errors.New(errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("component[%d] (%s): must have exactly one deployment type configuration (helm, kustomize, or direct)", index, comp.Name))
+		}
+		return errors.New(errors.ErrCodeInvalidRequest,
+			fmt.Sprintf("component[%d] (%s): cannot have multiple deployment type configurations (helm, kustomize, direct) - found %d", index, comp.Name, configCount))
+	}
+	return nil
 }
 
 // GetSystemNodeSelectorPaths returns all system node selector paths for a component.
@@ -388,11 +428,15 @@ func (c *ComponentConfig) GetValidations() []ComponentValidationConfig {
 }
 
 // GetType returns the component deployment type based on which config is present.
-// Returns ComponentTypeKustomize if Kustomize.DefaultSource is set,
+// Returns ComponentTypeDirect if Direct.SourceFile is set,
+// ComponentTypeKustomize if Kustomize.DefaultSource is set,
 // otherwise returns ComponentTypeHelm (the default).
 func (c *ComponentConfig) GetType() ComponentType {
 	if c == nil {
 		return ComponentTypeHelm
+	}
+	if c.Direct.SourceFile != "" {
+		return ComponentTypeDirect
 	}
 	if c.Kustomize.DefaultSource != "" {
 		return ComponentTypeKustomize

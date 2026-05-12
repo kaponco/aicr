@@ -422,6 +422,7 @@ func TestMergeComponentRef_AdvancedFields(t *testing.T) {
 	t.Run("patches replaced by overlay", func(t *testing.T) {
 		base := ComponentRef{
 			Name:    "test",
+			Type:    ComponentTypeKustomize,
 			Patches: []string{"base-patch.yaml"},
 		}
 		overlay := ComponentRef{
@@ -514,7 +515,7 @@ func TestMergeComponentRef_AdvancedFields(t *testing.T) {
 	})
 
 	t.Run("tag from overlay", func(t *testing.T) {
-		base := ComponentRef{Name: "test", Tag: "v1.0"}
+		base := ComponentRef{Name: "test", Type: ComponentTypeKustomize, Tag: "v1.0"}
 		overlay := ComponentRef{Name: "test", Tag: "v2.0"}
 		result := mergeComponentRef(base, overlay)
 		if result.Tag != "v2.0" {

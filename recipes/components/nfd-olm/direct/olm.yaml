@@ -16,11 +16,6 @@
 # These manifests install NFD via OpenShift's Operator Lifecycle Manager (OLM).
 # Reference: https://docs.openshift.com/container-platform/latest/hardware_enablement/psap-node-feature-discovery-operator.html
 ---
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-nfd
----
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:

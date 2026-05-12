@@ -43,6 +43,7 @@ type Component struct {
 	Path string
 	// Direct (static YAML manifests)
 	SourceFile string // path to static YAML file for Direct components
+	Olm        bool   // true for OLM operator components (enables CSV wait logic in install.sh)
 	// Values hydrated by the component bundler
 	Values       map[string]any
 	DynamicPaths []string // paths moved from values.yaml into cluster-values.yaml

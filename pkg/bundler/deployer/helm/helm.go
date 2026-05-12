@@ -57,6 +57,7 @@ type ComponentData struct {
 	Tag        string // Git ref for Kustomize-typed components (tag/branch/commit)
 	Path       string // Path within the repository to the kustomization
 	SourceFile string // Path to static YAML file for Direct components
+	Olm        bool   // True for OLM operator components (enables CSV wait logic in install.sh)
 }
 
 // compile-time interface check
@@ -265,6 +266,7 @@ func (g *Generator) buildComponentDataList() ([]ComponentData, error) {
 			Tag:        ref.Tag,
 			Path:       ref.Path,
 			SourceFile: ref.SourceFile,
+			Olm:        ref.Olm,
 		})
 	}
 
@@ -292,6 +294,7 @@ func toLocalformatComponents(
 			Tag:          c.Tag,
 			Path:         c.Path,
 			SourceFile:   c.SourceFile,
+			Olm:          c.Olm,
 			Values:       values[c.Name],
 			DynamicPaths: dynamic[c.Name],
 		})

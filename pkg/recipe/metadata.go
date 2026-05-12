@@ -93,6 +93,10 @@ type ComponentRef struct {
 	// Used by Direct deployment type to specify static Kubernetes manifests.
 	SourceFile string `json:"sourceFile,omitempty" yaml:"sourceFile,omitempty"`
 
+	// Olm indicates this component installs an operator via OLM.
+	// When true, the bundler embeds CSV wait logic in install.sh for Direct deployments.
+	Olm bool `json:"olm,omitempty" yaml:"olm,omitempty"`
+
 	// Overrides contains inline values that override those from ValuesFile.
 	// Merge order: base values → ValuesFile → Overrides (highest precedence).
 	Overrides map[string]any `json:"overrides,omitempty" yaml:"overrides,omitempty"`
@@ -244,8 +248,15 @@ func (ref *ComponentRef) ApplyRegistryDefaults(config *ComponentConfig) {
 			ref.Path = config.Kustomize.DefaultPath
 		}
 	case ComponentTypeDirect:
-		// Direct components use static YAML manifests embedded in AICR.
-		// No defaults to apply - sourceFile comes from registry config.
+		// Apply Direct defaults
+		if ref.SourceFile == "" && config.Direct.SourceFile != "" {
+			ref.SourceFile = config.Direct.SourceFile
+		}
+	}
+
+	// Apply Olm flag for all types (but only used for Direct deployments)
+	if !ref.Olm && config.Olm {
+		ref.Olm = config.Olm
 	}
 
 	// NOTE: healthCheck.assertFile content is intentionally NOT loaded here.
@@ -537,6 +548,7 @@ func (s *RecipeMetadataSpec) Merge(other *RecipeMetadataSpec) {
 
 // mergeComponentRef merges overlay into base, with overlay taking precedence
 // for non-empty fields. Empty/zero fields in overlay inherit from base.
+// When the overlay changes the Type, type-incompatible fields are cleared.
 func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 	result := base // Start with base values
 
@@ -551,32 +563,61 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 	}
 
 	// Type: overlay takes precedence if set
-	if overlay.Type != "" {
+	// If type changes, clear incompatible fields
+	if overlay.Type != "" && overlay.Type != base.Type {
+		result.Type = overlay.Type
+
+		// Clear type-incompatible fields when type changes
+		switch overlay.Type {
+		case ComponentTypeDirect:
+			// Clear Helm/Kustomize-specific fields
+			result.Source = ""
+			result.Version = ""
+			result.Chart = ""
+			result.ValuesFile = ""
+			result.Tag = ""
+			result.Path = ""
+			result.Patches = nil
+		case ComponentTypeHelm:
+			// Clear Direct/Kustomize-specific fields
+			result.SourceFile = ""
+			result.Tag = ""
+			result.Path = ""
+			result.Patches = nil
+		case ComponentTypeKustomize:
+			// Clear Direct/Helm-specific fields
+			result.SourceFile = ""
+			result.Version = ""
+			result.Chart = ""
+			result.ValuesFile = ""
+		}
+	} else if overlay.Type != "" {
 		result.Type = overlay.Type
 	}
 
-	// Source: overlay takes precedence if set
-	if overlay.Source != "" {
+	// Only merge type-appropriate fields (unless type just changed and fields were already cleared)
+	// Source: overlay takes precedence if set (Helm/Kustomize)
+	if overlay.Source != "" && result.Type != ComponentTypeDirect {
 		result.Source = overlay.Source
 	}
 
-	// Version: overlay takes precedence if set
-	if overlay.Version != "" {
+	// Version: overlay takes precedence if set (Helm)
+	if overlay.Version != "" && result.Type == ComponentTypeHelm {
 		result.Version = overlay.Version
 	}
 
-	// Tag: overlay takes precedence if set
-	if overlay.Tag != "" {
+	// Tag: overlay takes precedence if set (Kustomize)
+	if overlay.Tag != "" && result.Type == ComponentTypeKustomize {
 		result.Tag = overlay.Tag
 	}
 
-	// ValuesFile: overlay takes precedence if set
-	if overlay.ValuesFile != "" {
+	// ValuesFile: overlay takes precedence if set (Helm)
+	if overlay.ValuesFile != "" && result.Type == ComponentTypeHelm {
 		result.ValuesFile = overlay.ValuesFile
 	}
 
-	// SourceFile: overlay takes precedence if set
-	if overlay.SourceFile != "" {
+	// SourceFile: overlay takes precedence if set (Direct)
+	if overlay.SourceFile != "" && result.Type == ComponentTypeDirect {
 		result.SourceFile = overlay.SourceFile
 	}
 
@@ -588,8 +629,8 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 		deepMergeMap(result.Overrides, overlay.Overrides)
 	}
 
-	// Patches: overlay replaces if set
-	if len(overlay.Patches) > 0 {
+	// Patches: overlay replaces if set (Kustomize only)
+	if len(overlay.Patches) > 0 && result.Type == ComponentTypeKustomize {
 		result.Patches = overlay.Patches
 	}
 
@@ -621,8 +662,8 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 		}
 	}
 
-	// Path: overlay takes precedence if set (for Kustomize)
-	if overlay.Path != "" {
+	// Path: overlay takes precedence if set (Kustomize only)
+	if overlay.Path != "" && result.Type == ComponentTypeKustomize {
 		result.Path = overlay.Path
 	}
 

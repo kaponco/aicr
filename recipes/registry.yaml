@@ -130,6 +130,7 @@ components:
     helm:
       # Manifest-only component - no external Helm chart, uses manifestFiles
       defaultRepository: ""
+      defaultChart: ""
       defaultNamespace: kube-system
 
   - name: aws-efa
@@ -209,6 +210,7 @@ components:
     helm:
       # Manifest-only component - no external Helm chart, uses manifestFiles
       defaultRepository: ""
+      defaultChart: ""
       defaultNamespace: skyhook
     nodeScheduling:
       accelerated:
@@ -525,6 +527,7 @@ components:
     displayName: GPU Operator (OLM)
     valueOverrideKeys:
       - gpuoperatorolm
+    olm: true
     direct:
       sourceFile: recipes/components/gpu-operator-olm/direct/olm.yaml
 
@@ -532,5 +535,6 @@ components:
     displayName: Node Feature Discovery (OLM)
     valueOverrideKeys:
       - nfdolm
+    olm: true
     direct:
       sourceFile: recipes/components/nfd-olm/direct/olm.yaml

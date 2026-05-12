@@ -20,11 +20,16 @@ apiVersion: nfd.openshift.io/v1
 kind: NodeFeatureDiscovery
 metadata:
   name: nfd-instance
-  namespace: openshift-nfd
 spec:
+  instance: ''
   operand:
-    image: registry.redhat.io/openshift4/ose-node-feature-discovery:v4.14
-    imagePullPolicy: Always
+    # image: to get the image run and copy here (if nul leave empty):
+    #   oc get csv -n openshift-nfd -o json | \
+    #     jq -r '.items[0].metadata.annotations["alm-examples"]' | tr -d '\000-\037' | \
+    #     jq -r '.[] | select(.kind == "NodeFeatureDiscovery") | .spec.operand.image'
+    servicePort: 12000
+  prunerOnDelete: false
+  topologyUpdater: false
   workerConfig:
     configData: |
       core:
@@ -32,8 +37,10 @@ spec:
       sources:
         pci:
           deviceClassWhitelist:
-            - "0200"
+            - "02"
             - "03"
+            - "0200"
+            - "0207"
             - "12"
           deviceLabelFields:
             - "vendor"

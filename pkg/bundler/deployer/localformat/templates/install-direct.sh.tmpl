@@ -24,3 +24,27 @@ kubectl create namespace {{ .Namespace }} ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
 {{- end }}
 # Apply the static YAML manifest using kubectl
 kubectl apply -f {{ .ManifestFilename }} {{- if .Namespace }} -n {{ .Namespace }}{{- end }} ${DRY_RUN_FLAG:-} ${KUBECONFIG_FLAG:-}
+{{- if .Olm }}
+
+# Wait for ClusterServiceVersion to reach Succeeded phase
+echo "Waiting for OLM operator CSV to reach Succeeded phase..."
+TIMEOUT=300
+INTERVAL=5
+ELAPSED=0
+
+while [ $ELAPSED -lt $TIMEOUT ]; do
+  CSV_PHASE=$(kubectl get csv -n {{ .Namespace }} -o jsonpath='{.items[0].status.phase}' ${KUBECONFIG_FLAG:-} 2>/dev/null || echo "")
+
+  if [ "$CSV_PHASE" = "Succeeded" ]; then
+    echo "CSV reached Succeeded phase"
+    exit 0
+  fi
+
+  echo "CSV phase: ${CSV_PHASE:-<not found>}, waiting... (${ELAPSED}s/${TIMEOUT}s)"
+  sleep $INTERVAL
+  ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+echo "ERROR: Timeout waiting for CSV to reach Succeeded phase after ${TIMEOUT}s"
+exit 1
+{{- end }}

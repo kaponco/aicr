@@ -80,10 +80,12 @@ func writeDirectFolder(outputDir, dir string, idx int, c Component) (Folder, err
 		ComponentName    string
 		Namespace        string
 		ManifestFilename string
+		Olm              bool
 	}{
 		ComponentName:    c.Name,
 		Namespace:        c.Namespace,
 		ManifestFilename: manifestFilename,
+		Olm:              c.Olm,
 	}
 
 	if err := renderTemplateToFile(tmpl, data, folderDir, "install.sh", 0o755); err != nil {

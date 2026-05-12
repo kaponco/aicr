@@ -19,33 +19,40 @@
 apiVersion: nvidia.com/v1
 kind: ClusterPolicy
 metadata:
-  name: gpu-cluster-policy
+  name: cluster-policy
 spec:
   operator:
-    # OpenShift uses CRI-O as the default container runtime
     defaultRuntime: crio
-
   driver:
     enabled: true
-    # Driver version for OpenShift / RHEL CoreOS
-    version: "550.54.15"
-
-  toolkit:
+    rdma:
+      enabled: true
+      useHostMofed: false
+  cdi:
     enabled: true
-
-  devicePlugin:
+    default: true
+  dcgm:
     enabled: true
-
-  # DCGM exporter for Prometheus metrics
-  dcgmExporter:
-    enabled: true
-    config:
-      name: ""
-
-  # GPU Feature Discovery
   gfd:
     enabled: true
-
-  # Node Feature Discovery - disabled because it's deployed as a standalone component
-  nfd:
+  dcgmExporter:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  devicePlugin:
+    enabled: true
+  toolkit:
+    enabled: true
+    installDir: /usr/local/nvidia
+  gdrcopy:
     enabled: false
+  sandboxWorkloads:
+    enabled: false
+  nodeStatusExporter:
+    enabled: true
+  daemonsets:
+    tolerations:
+      - operator: Exists
+    rollingUpdate:
+      maxUnavailable: '1'
+    updateStrategy: RollingUpdate
