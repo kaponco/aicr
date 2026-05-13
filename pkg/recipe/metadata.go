@@ -583,12 +583,14 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 		case ComponentTypeHelm:
 			// Clear Direct/Kustomize-specific fields
 			result.SourceFile = ""
+			result.Olm = false
 			result.Tag = ""
 			result.Path = ""
 			result.Patches = nil
 		case ComponentTypeKustomize:
 			// Clear Direct/Helm-specific fields
 			result.SourceFile = ""
+			result.Olm = false
 			result.Version = ""
 			result.Chart = ""
 			result.ValuesFile = ""
@@ -621,6 +623,11 @@ func mergeComponentRef(base, overlay ComponentRef) ComponentRef {
 	// SourceFile: overlay takes precedence if set (Direct)
 	if overlay.SourceFile != "" && result.Type == ComponentTypeDirect {
 		result.SourceFile = overlay.SourceFile
+	}
+
+	// Olm: overlay takes precedence if set (Direct only)
+	if overlay.Olm && result.Type == ComponentTypeDirect {
+		result.Olm = true
 	}
 
 	// Overrides: deep-merge maps, overlay takes precedence

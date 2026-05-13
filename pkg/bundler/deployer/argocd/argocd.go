@@ -361,6 +361,13 @@ func (g *Generator) Generate(ctx context.Context, outputDir string) (*deployer.O
 				fmt.Sprintf("localformat returned folder for unknown component %q", f.Parent))
 		}
 
+		if f.Kind == localformat.KindDirect {
+			return nil, errors.New(
+				errors.ErrCodeInvalidRequest,
+				fmt.Sprintf("component %q uses direct manifests, which are not supported by the argocd deployer; use --deployer helm", f.Parent),
+			)
+		}
+
 		appData := buildApplicationData(*comp, f, i, repoURL, targetRevision)
 		appDataList = append(appDataList, appData)
 
@@ -538,10 +545,6 @@ func buildApplicationData(comp recipe.ComponentRef, f localformat.Folder, syncWa
 			data.Version = deployer.NormalizeVersion(comp.Version)
 		}
 		data.Chart = chart
-	case localformat.KindDirect:
-		// Direct components are not supported in ArgoCD deployer.
-		// Direct components use kubectl apply instead of Helm, which doesn't fit
-		// the Argo CD Application resource model. Use the helm deployer instead.
 	}
 	return data
 }

@@ -374,7 +374,9 @@ func TestWrite_DirectWithRealFiles(t *testing.T) {
 		"kubectl apply",
 		"olm.yaml",
 		"ClusterServiceVersion",
-		"CSV reached Succeeded phase",
+		"reached Succeeded phase",
+		"kubectl get subscription",
+		"installedCSV",
 		"TIMEOUT=",
 		"-n nvidia-gpu-operator",
 	}
@@ -390,7 +392,14 @@ func TestWrite_DirectWithRealFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read uninstall.sh: %v", err)
 	}
-	if !strings.Contains(string(uninstallContent), "kubectl get csv") {
+	// Verify it queries subscriptions to find CSVs
+	if !strings.Contains(string(uninstallContent), "kubectl get subscription") {
+		t.Errorf("OLM uninstall.sh should query Subscriptions to find CSVs")
+	}
+	if !strings.Contains(string(uninstallContent), "installedCSV") {
+		t.Errorf("OLM uninstall.sh should extract installedCSV from Subscription")
+	}
+	if !strings.Contains(string(uninstallContent), "kubectl delete csv") {
 		t.Errorf("OLM uninstall.sh should contain CSV deletion logic")
 	}
 	if !strings.Contains(string(uninstallContent), "kubectl delete") {
@@ -538,8 +547,17 @@ func TestWrite_DirectOLMTimeoutConstants(t *testing.T) {
 	}
 
 	// Verify CSV wait logic
-	if !strings.Contains(script, "CSV reached Succeeded phase") {
+	if !strings.Contains(script, "reached Succeeded phase") {
 		t.Error("install.sh should contain CSV success message")
+	}
+
+	// Verify we resolve CSV name from Subscription
+	if !strings.Contains(script, "kubectl get subscription") {
+		t.Error("install.sh should query Subscription to resolve CSV name")
+	}
+
+	if !strings.Contains(script, "installedCSV") {
+		t.Error("install.sh should extract installedCSV from Subscription status")
 	}
 }
 

@@ -918,3 +918,49 @@ components:
 		t.Errorf("GetType() = %v, want %v", comp.GetType(), ComponentTypeKustomize)
 	}
 }
+
+func TestValidateDeploymentTypeExclusion_HelmDefaultVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		comp    ComponentConfig
+		wantErr bool
+	}{
+		{
+			name: "helm with only DefaultVersion is valid",
+			comp: ComponentConfig{
+				Name: "test-component",
+				Helm: HelmConfig{
+					DefaultVersion: "1.0.0",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "helm with DefaultVersion and DefaultRepository",
+			comp: ComponentConfig{
+				Name: "test-component",
+				Helm: HelmConfig{
+					DefaultVersion:    "1.0.0",
+					DefaultRepository: "https://charts.example.com",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "no deployment type configured should error",
+			comp: ComponentConfig{
+				Name: "test-component",
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateDeploymentTypeExclusion(tt.comp, 0)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateDeploymentTypeExclusion() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

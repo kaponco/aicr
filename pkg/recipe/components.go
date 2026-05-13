@@ -329,7 +329,10 @@ func (r *ComponentRegistry) Validate() []error {
 // validateDeploymentTypeExclusion ensures exactly one deployment type is configured.
 // Returns an error if zero or multiple deployment types are set.
 func validateDeploymentTypeExclusion(comp ComponentConfig, index int) error {
-	hasHelm := comp.Helm.DefaultRepository != "" || comp.Helm.DefaultChart != "" || comp.Helm.DefaultNamespace != ""
+	hasHelm := comp.Helm.DefaultRepository != "" ||
+		comp.Helm.DefaultChart != "" ||
+		comp.Helm.DefaultNamespace != "" ||
+		comp.Helm.DefaultVersion != ""
 	hasKustomize := comp.Kustomize.DefaultSource != ""
 	hasDirect := comp.Direct.SourceFile != ""
 

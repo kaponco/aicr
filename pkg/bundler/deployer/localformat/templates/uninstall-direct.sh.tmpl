@@ -18,12 +18,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 {{- if .Olm }}
-# For OLM-managed operators, delete the ClusterServiceVersion (CSV) first
-# This removes the actual operator deployment before removing the Subscription
-csv_name=$(kubectl get csv -n {{ .Namespace }} -o name 2>/dev/null | head -1)
-if [[ -n "${csv_name}" ]]; then
-  echo "Deleting ClusterServiceVersion: ${csv_name}"
-  kubectl delete "${csv_name}" -n {{ .Namespace }} --ignore-not-found --timeout="${HELM_TIMEOUT:-120}s" || true
+# For OLM-managed operators, delete the ClusterServiceVersions (CSVs) first
+# This removes the actual operator deployments before removing the Subscriptions
+# Enumerate all Subscriptions in the namespace and delete their associated CSVs
+subscriptions=$(kubectl get subscription -n {{ .Namespace }} -o jsonpath='{.items[*].metadata.name}' ${KUBECONFIG_FLAG:-} 2>/dev/null || echo "")
+
+if [[ -n "${subscriptions}" ]]; then
+  for sub in ${subscriptions}; do
+    csv_name=$(kubectl get subscription "${sub}" -n {{ .Namespace }} -o jsonpath='{.status.installedCSV}' ${KUBECONFIG_FLAG:-} 2>/dev/null || echo "")
+    if [[ -n "${csv_name}" ]]; then
+      echo "Deleting ClusterServiceVersion: ${csv_name} (from Subscription: ${sub})"
+      kubectl delete csv "${csv_name}" -n {{ .Namespace }} --ignore-not-found --timeout="${HELM_TIMEOUT:-120}s" ${KUBECONFIG_FLAG:-} || true
+    fi
+  done
 fi
 
 {{- end }}

@@ -44,7 +44,7 @@ This separation ensures the operator is fully installed and ready before applyin
 
 ### OLM Resource Flow
 
-```
+```text
 User creates Subscription
         ↓
 OLM creates ClusterServiceVersion (CSV)

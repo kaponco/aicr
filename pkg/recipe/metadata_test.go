@@ -1589,3 +1589,84 @@ func TestNFDTopologyUpdater_OverlayCoverage(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeComponentRef_OlmField(t *testing.T) {
+	tests := []struct {
+		name     string
+		base     ComponentRef
+		overlay  ComponentRef
+		expected ComponentRef
+	}{
+		{
+			name: "olm true in overlay applied to direct component",
+			base: ComponentRef{
+				Name: "gpu-operator-olm",
+				Type: ComponentTypeDirect,
+			},
+			overlay: ComponentRef{
+				Olm: true,
+			},
+			expected: ComponentRef{
+				Name: "gpu-operator-olm",
+				Type: ComponentTypeDirect,
+				Olm:  true,
+			},
+		},
+		{
+			name: "olm cleared when transitioning from direct to helm",
+			base: ComponentRef{
+				Name:       "gpu-operator",
+				Type:       ComponentTypeDirect,
+				SourceFile: "olm.yaml",
+				Olm:        true,
+			},
+			overlay: ComponentRef{
+				Type:    ComponentTypeHelm,
+				Source:  "https://charts.example.com",
+				Chart:   "gpu-operator",
+				Version: "1.0.0",
+			},
+			expected: ComponentRef{
+				Name:    "gpu-operator",
+				Type:    ComponentTypeHelm,
+				Source:  "https://charts.example.com",
+				Chart:   "gpu-operator",
+				Version: "1.0.0",
+				Olm:     false,
+			},
+		},
+		{
+			name: "olm cleared when transitioning from direct to kustomize",
+			base: ComponentRef{
+				Name:       "gpu-operator",
+				Type:       ComponentTypeDirect,
+				SourceFile: "olm.yaml",
+				Olm:        true,
+			},
+			overlay: ComponentRef{
+				Type:   ComponentTypeKustomize,
+				Source: "https://github.com/example/repo",
+				Tag:    "v1.0.0",
+			},
+			expected: ComponentRef{
+				Name:   "gpu-operator",
+				Type:   ComponentTypeKustomize,
+				Source: "https://github.com/example/repo",
+				Tag:    "v1.0.0",
+				Olm:    false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mergeComponentRef(tt.base, tt.overlay)
+			if result.Olm != tt.expected.Olm {
+				t.Errorf("Olm = %v, want %v", result.Olm, tt.expected.Olm)
+			}
+			if result.Type != tt.expected.Type {
+				t.Errorf("Type = %v, want %v", result.Type, tt.expected.Type)
+			}
+		})
+	}
+}

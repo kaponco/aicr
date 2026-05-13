@@ -33,14 +33,25 @@ INTERVAL=${AICR_OLM_CSV_INTERVAL:-{{ .CSVPollIntervalSeconds }}}
 ELAPSED=0
 
 while [ $ELAPSED -lt $TIMEOUT ]; do
-  CSV_PHASE=$(kubectl get csv -n {{ .Namespace }} -o jsonpath='{.items[0].status.phase}' ${KUBECONFIG_FLAG:-} 2>/dev/null || echo "")
+  # Resolve the installed CSV name from the Subscription
+  CSV_NAME=$(kubectl get subscription -n {{ .Namespace }} -o jsonpath='{.items[0].status.installedCSV}' ${KUBECONFIG_FLAG:-} 2>/dev/null || echo "")
+
+  if [ -z "$CSV_NAME" ]; then
+    echo "Waiting for Subscription to report installedCSV... (${ELAPSED}s/${TIMEOUT}s)"
+    sleep $INTERVAL
+    ELAPSED=$((ELAPSED + INTERVAL))
+    continue
+  fi
+
+  # Check the specific CSV's phase
+  CSV_PHASE=$(kubectl get csv "$CSV_NAME" -n {{ .Namespace }} -o jsonpath='{.status.phase}' ${KUBECONFIG_FLAG:-} 2>/dev/null || echo "")
 
   if [ "$CSV_PHASE" = "Succeeded" ]; then
-    echo "CSV reached Succeeded phase"
+    echo "CSV ${CSV_NAME} reached Succeeded phase"
     exit 0
   fi
 
-  echo "CSV phase: ${CSV_PHASE:-<not found>}, waiting... (${ELAPSED}s/${TIMEOUT}s)"
+  echo "CSV ${CSV_NAME} phase: ${CSV_PHASE:-<not found>}, waiting... (${ELAPSED}s/${TIMEOUT}s)"
   sleep $INTERVAL
   ELAPSED=$((ELAPSED + INTERVAL))
 done
