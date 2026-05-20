@@ -223,52 +223,16 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: ./tests/uat/gcp/run verify "${TEST_CONFIG}"
 
-      # Teardown (retry up to 3 times)
-      - name: Destroy Cluster
-        if: always() && steps.infra.outcome != 'skipped' && inputs.skip_delete != true
-        shell: bash
-        run: |
-          set -euxo pipefail
-          yq -i '.deployment.destroy = true' "$CLUSTER_CONFIG"
-          cat "$CLUSTER_CONFIG"
-          for attempt in 1 2 3; do
-            echo "Destroy attempt ${attempt}..."
-            if docker run \
-              -e CONFIG_CONTENT="$(base64 < $CLUSTER_CONFIG)" \
-              -e AUTO_APPROVE=true \
-              -e KEY_CONTENT="$(base64 < ${{ steps.auth.outputs.credentials_file_path }})" \
-              ${{ env.GKE_ACTUATOR_IMAGE }} apply; then
-              echo "Cluster destroyed successfully"
-              break
-            fi
-            echo "Destroy attempt ${attempt} failed, retrying..."
-            sleep 30
-          done
-
-      # Cleanup
-      - name: Cleanup validator image
-        if: always() && inputs.skip_tests != true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Delete UAT-tagged validator images to avoid GHCR clutter
-          for phase in deployment performance conformance; do
-            VERSION_ID=$(gh api \
-              "repos/${{ github.repository }}/packages/container/aicr-validators%2F${phase}/versions" \
-              --jq ".[] | select(.metadata.container.tags[] == \"${VALIDATOR_TAG}\") | .id" 2>/dev/null) || true
-            if [[ -n "${VERSION_ID}" ]]; then
-              gh api --method DELETE \
-                "repos/${{ github.repository }}/packages/container/aicr-validators%2F${phase}/versions/${VERSION_ID}" || true
-            fi
-          done
-
-      # Artifacts
+      # Artifacts + summary run BEFORE teardown so a slow or failing
+      # `Destroy Cluster` (which can take 10+ min) does not delay or
+      # consume the job-timeout budget needed to persist evidence.
       #
-      # The signed evidence bundle itself is pushed to OCI by the conformance
-      # step (ghcr.io/nvidia/aicr-uat-gke-h100-training-${{ github.run_id }})
-      # and is the source of truth; here we attach the lightweight pointer
-      # so a reviewer can locate that bundle directly from the Actions UI
-      # for up to a year. Failure-debug artifacts are scoped tighter (30d).
+      # The signed evidence bundle itself is pushed to OCI by the
+      # conformance step (ghcr.io/nvidia/aicr-uat-gke-h100-training-${{
+      # github.run_id }}) and is the source of truth; here we attach the
+      # lightweight pointer so a reviewer can locate that bundle directly
+      # from the Actions UI for up to a year. Failure-debug artifacts are
+      # scoped tighter (30d).
       - name: Upload evidence pointer
         if: always() && steps.conformance.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -319,3 +283,43 @@ jobs:
               echo "**Evidence (OCI):** \`ghcr.io/nvidia/aicr-uat-gke-h100-training-${{ github.run_id }}\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Cleanup (after artifacts so a failed cleanup does not lose evidence).
+      - name: Cleanup validator image
+        if: always() && inputs.skip_tests != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Delete UAT-tagged validator images to avoid GHCR clutter
+          for phase in deployment performance conformance; do
+            VERSION_ID=$(gh api \
+              "repos/${{ github.repository }}/packages/container/aicr-validators%2F${phase}/versions" \
+              --jq ".[] | select(.metadata.container.tags[] == \"${VALIDATOR_TAG}\") | .id" 2>/dev/null) || true
+            if [[ -n "${VERSION_ID}" ]]; then
+              gh api --method DELETE \
+                "repos/${{ github.repository }}/packages/container/aicr-validators%2F${phase}/versions/${VERSION_ID}" || true
+            fi
+          done
+
+      # Teardown (retry up to 3 times). Runs last so a slow destroy
+      # cannot block evidence upload or summary rendering.
+      - name: Destroy Cluster
+        if: always() && steps.infra.outcome != 'skipped' && inputs.skip_delete != true
+        shell: bash
+        run: |
+          set -euxo pipefail
+          yq -i '.deployment.destroy = true' "$CLUSTER_CONFIG"
+          cat "$CLUSTER_CONFIG"
+          for attempt in 1 2 3; do
+            echo "Destroy attempt ${attempt}..."
+            if docker run \
+              -e CONFIG_CONTENT="$(base64 < $CLUSTER_CONFIG)" \
+              -e AUTO_APPROVE=true \
+              -e KEY_CONTENT="$(base64 < ${{ steps.auth.outputs.credentials_file_path }})" \
+              ${{ env.GKE_ACTUATOR_IMAGE }} apply; then
+              echo "Cluster destroyed successfully"
+              break
+            fi
+            echo "Destroy attempt ${attempt} failed, retrying..."
+            sleep 30
+          done
