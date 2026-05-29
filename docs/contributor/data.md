@@ -482,12 +482,16 @@ The gpu-operator version pin from `gb200-any` lands in the hydrated recipe witho
 | Adopt-by-default is desired for new matching overlays | Each consumer should reference it explicitly |
 | You want to add `validation` blocks (mixins don't carry validation) | You only need `constraints` / `componentRefs` |
 
-**Precedence when a wildcard overlay and a service-specific leaf collide.** `FindMatchingOverlays` sorts its returned leaves by `Criteria.Specificity()` ascending, so less-specific overlays merge first and more-specific overlays merge last. Two different merge rules apply — they are not the same:
+**Precedence when a wildcard overlay and a service-specific leaf collide.** `FindMatchingOverlays` sorts its returned leaves by `Criteria.Specificity()` ascending, so less-specific overlays merge first and more-specific overlays merge last. Both top-level constraints and `spec.validation.<phase>` blocks merge per-field — the more-specific leaf adds to or overrides the wildcard's block without replacing it wholesale:
 
 - **Top-level `spec.constraints`** merge by name. A same-named constraint from the more-specific leaf overrides the wildcard's value (the "overridden, new added" rule from the merge algorithm).
-- **`spec.validation.<phase>`** blocks (deployment, performance, conformance) are **replaced wholesale** when a later overlay defines the same phase — no field-level merge. The leaf's `checks` and `constraints` replace the wildcard's entire block.
+- **`spec.validation.<phase>`** blocks (readiness, deployment, performance, conformance) also merge per-field:
+  - `checks`: an omitted field (nil) inherits the parent's list; an explicit empty list (`checks: []`) clears the inherited list for that phase; a non-empty list unions with the parent's, deduplicated and preserving order (parent entries first, then leaf-only entries appended).
+  - `constraints`: same nil-vs-empty rule as `checks`; a non-empty list unions by `name` with the leaf winning on same-name (analogous to the top-level constraint merge).
+  - `nodeSelection`: overlay replaces wholesale when non-nil (full struct replace).
+  - `timeout`, `infrastructure`: overlay-wins-if-non-empty.
 
-This distinction matters. To override only one value in the wildcard's deployment phase from the example above, a service-specific leaf must restate **every** `check` it wants to keep AND every constraint, because the wildcard's block is replaced wholesale once the leaf declares the same phase:
+A leaf that only needs to tighten one constraint can declare just that constraint — the wildcard's checks and other constraints are inherited automatically:
 
 ```yaml
 # recipes/overlays/gb200-eks-training.yaml — illustrative; real leaf has
@@ -495,17 +499,28 @@ This distinction matters. To override only one value in the wildcard's deploymen
 spec:
   validation:
     deployment:
-      checks:                            # Must restate every check —
-        - operator-health                # else the wildcard's checks are
-        - expected-resources             # dropped and the phase is skipped.
-        - gpu-operator-version
-        - check-nvidia-smi
+      # `checks` omitted — wildcard's 4 standard checks are inherited.
       constraints:
         - name: Deployment.gpu-operator.version
           value: ">= v25.10.1"           # Tighten past the wildcard's floor.
 ```
 
-Setting only `constraints` (or only a subset of `checks`) drops the wildcard's remaining check names, which causes `filterEntriesByRecipe` to return zero entries for them and the corresponding phase to be skipped entirely — the opposite of the "tighten one value" intent.
+Leaves may still restate the inherited list when it documents intent (e.g., recording which checks the leaf depends on). With per-field union, restating is a no-op: duplicates dedupe against the wildcard's entries.
+
+To intentionally drop an inherited check or constraint, declare the field as an explicit empty list (`checks: []` / `constraints: []`) rather than omitting it. Omission means "inherit"; explicit empty means "clear":
+
+```yaml
+# recipes/overlays/h100-eks-ubuntu-training-slurm.yaml — Slurm-managed
+# clusters bypass slurmd for K8s-native NCCL tests, so the leaf clears
+# the inherited performance phase rather than running it.
+spec:
+  validation:
+    performance:
+      checks: []        # Explicit clear — drops inherited nccl-all-reduce-bw.
+      constraints: []   # Same — clears the inherited >= 300 floor.
+```
+
+This distinction is preserved by `yaml.v3`: a YAML `[]` decodes as a non-nil empty slice (clear), while an omitted or `null` field decodes as nil (inherit).
 
 Criteria-wildcard overlays are only appropriate when the content is genuinely uniform across the wildcard dimension. If the value diverges (e.g., H100 NCCL targets differ by cloud: AKS ≥ 100, EKS ≥ 300, GKE ≥ 250), keep it inline in each service-specific overlay — collapsing divergent values to a lowest-common-denominator wildcard silently weakens validation.
 
