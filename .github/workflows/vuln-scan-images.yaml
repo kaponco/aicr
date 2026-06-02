@@ -222,16 +222,6 @@ jobs:
       - name: Authenticate to registry
         uses: ./.github/actions/ghcr-login
 
-      - name: Debug VEX inputs (pre-scan)
-        if: contains(matrix.image, 'aiperf-bench')
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "pwd=$(pwd)"
-          ls -la .grype.yaml .openvex.json
-          echo "--- .openvex.json statement names ---"
-          jq -r '.statements | map(.vulnerability.name) | .[]' .openvex.json
-
       - name: Scan container image
         id: scan
         uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2  # v7.4.0
@@ -248,55 +238,48 @@ jobs:
           # images in the matrix.
           vex: .openvex.json
 
-      - name: Debug scan output (aiperf-bench only)
-        if: always() && contains(matrix.image, 'aiperf-bench')
-        shell: bash
-        run: |
-          set -euo pipefail
-          JSON_FILE="${{ steps.scan.outputs.json }}"
-          echo "json=${JSON_FILE}"
-          ls -la "${JSON_FILE}" || true
-          echo "--- source target.userInput ---"
-          jq -r '.source.target.userInput // empty' "${JSON_FILE}"
-          echo "--- source target.repoDigests ---"
-          jq -r '.source.target.repoDigests // empty' "${JSON_FILE}"
-          echo "--- source target.labels ---"
-          jq -r '.source.target.labels // empty' "${JSON_FILE}"
-          echo "--- HIGH+ in .matches[] (should be empty if VEX applied) ---"
-          jq '[.matches[]
-            | select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical")
-            | {id: .vulnerability.id,
-               related: [.relatedVulnerabilities[]?.id],
-               pkg: .artifact.name,
-               purl: .artifact.purl}]' "${JSON_FILE}"
-          echo "--- HIGH+ in .ignoredMatches[] (should hold VEX-suppressed entries) ---"
-          jq '[.ignoredMatches[]?
-            | select(.match.vulnerability.severity == "High" or .match.vulnerability.severity == "Critical")
-            | {id: .match.vulnerability.id, rules: .appliedIgnoreRules}]' "${JSON_FILE}"
-          echo "--- ignoredMatches total count ---"
-          jq '.ignoredMatches // [] | length' "${JSON_FILE}"
-
-      - name: Extract severity counts
+      - name: Extract severity counts and IDs
         shell: bash
         env:
           IMAGE: ${{ matrix.image }}
         run: |
           set -euo pipefail
           JSON_FILE="${{ steps.scan.outputs.json }}"
-          if [[ -f "${JSON_FILE}" ]]; then
-            CRITICAL=$(jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length' "${JSON_FILE}")
-            HIGH=$(jq '[.matches[] | select(.vulnerability.severity == "High")] | length' "${JSON_FILE}")
-            MEDIUM=$(jq '[.matches[] | select(.vulnerability.severity == "Medium")] | length' "${JSON_FILE}")
-            LOW=$(jq '[.matches[] | select(.vulnerability.severity == "Low")] | length' "${JSON_FILE}")
-            NEGLIGIBLE=$(jq '[.matches[] | select(.vulnerability.severity == "Negligible")] | length' "${JSON_FILE}")
-          else
-            CRITICAL=0; HIGH=0; MEDIUM=0; LOW=0; NEGLIGIBLE=0
-          fi
-
           SHORT_NAME="${IMAGE##*/}"
           mkdir -p scan-results
-          echo "${SHORT_NAME}: ${CRITICAL} critical, ${HIGH} high, ${MEDIUM} medium, ${LOW} low, ${NEGLIGIBLE} negligible" \
-            > "scan-results/${SHORT_NAME}.txt"
+          OUT="scan-results/${SHORT_NAME}.txt"
+
+          if [[ ! -f "${JSON_FILE}" ]]; then
+            echo "${SHORT_NAME}: scan output missing" > "${OUT}"
+            exit 0
+          fi
+
+          # Severity counts from non-suppressed matches.
+          CRITICAL=$(jq '[.matches[] | select(.vulnerability.severity == "Critical")] | length' "${JSON_FILE}")
+          HIGH=$(jq '[.matches[] | select(.vulnerability.severity == "High")] | length' "${JSON_FILE}")
+          MEDIUM=$(jq '[.matches[] | select(.vulnerability.severity == "Medium")] | length' "${JSON_FILE}")
+          LOW=$(jq '[.matches[] | select(.vulnerability.severity == "Low")] | length' "${JSON_FILE}")
+          NEGLIGIBLE=$(jq '[.matches[] | select(.vulnerability.severity == "Negligible")] | length' "${JSON_FILE}")
+          IGNORED=$(jq '.ignoredMatches // [] | length' "${JSON_FILE}")
+
+          # HIGH+ identifiers for triage. Emits primary ID (often a GHSA)
+          # plus any related CVE aliases so reviewers can cross-reference
+          # NVD without re-running the scan.
+          HIGH_IDS=$(jq -r '
+            [ .matches[]
+              | select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical")
+              | (.artifact.name + " " + .vulnerability.id
+                 + ( (.relatedVulnerabilities // [] | map(.id) | join(","))
+                     | if . == "" then "" else " (" + . + ")" end )) ]
+            | join(", ")' "${JSON_FILE}")
+
+          {
+            echo "${SHORT_NAME}: ${CRITICAL} critical, ${HIGH} high, ${MEDIUM} medium, ${LOW} low, ${NEGLIGIBLE} negligible (${IGNORED} VEX-suppressed)"
+            if [[ "${CRITICAL}" -gt 0 || "${HIGH}" -gt 0 ]]; then
+              echo "  HIGH+: ${HIGH_IDS}"
+            fi
+          } > "${OUT}"
+          cat "${OUT}"
 
       - name: Upload scan result
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -344,11 +327,15 @@ jobs:
           RESULTS=""
           for f in scan-results/*.txt; do
             [[ -f "$f" ]] || continue
-            LINE=$(cat "$f")
-            RESULTS="${RESULTS}\\n• ${LINE}"
-            # Parse "name: N critical, N high, ..."
-            C=$(echo "${LINE}" | grep -oP '\d+(?= critical)' || echo 0)
-            H=$(echo "${LINE}" | grep -oP '\d+(?= high)' || echo 0)
+            # First line: summary counts. Subsequent lines (when present):
+            # HIGH+ CVE/GHSA IDs for triage. Both flow into the Slack message.
+            HEADER=$(head -1 "$f")
+            BODY=$(cat "$f")
+            RESULTS="${RESULTS}\\n• ${BODY//$'\n'/\\n  }"
+            # Parse counts from the header line only so trailing ID lines
+            # never contaminate the totals.
+            C=$(echo "${HEADER}" | grep -oP '\d+(?= critical)' || echo 0)
+            H=$(echo "${HEADER}" | grep -oP '\d+(?= high)' || echo 0)
             TOTAL_CRITICAL=$((TOTAL_CRITICAL + C))
             TOTAL_HIGH=$((TOTAL_HIGH + H))
           done
