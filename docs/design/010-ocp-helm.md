@@ -16,6 +16,19 @@ configuration step within the current bundle structure.
 Users deploying AICR recipes on OCP today must manually translate Helm
 bundles into OLM resources, losing the validated-configuration guarantee.
 
+## Rationale: OLM Lifecycle via In-Tree Helm Templates
+
+OLM resources (Subscriptions, OperatorGroups, CatalogSources) and the
+Custom Resources they manage are plain Kubernetes objects. This design
+models them as in-tree Helm chart templates — the same mechanism AICR
+already uses for every other component. No OLM-specific deployer,
+adapter, or shell-based polling logic is required.
+
+This means the full OLM install lifecycle — creating a Subscription,
+waiting for the CSV to reach `Succeeded`, then applying the operator's
+CR — is expressed entirely through the existing bundler and deployer
+pipeline.
+
 ## Non-Goals
 
 - Helm-to-OLM migration tooling or automatic conversion.
@@ -373,6 +386,46 @@ operator, the CR chart configures it.
 4. `make qualify` passes.
 5. Chainsaw tests verify folder structure and manifest content for OCP
    bundles.
+
+## Consequences
+
+### Positive
+
+- No new deployer code — OLM resources flow through the existing
+  `KindLocalHelm` pipeline unchanged.
+- Full overlay and `--set` customization works out of the box because
+  OLM manifests are standard Helm templates with values.
+- Readiness gating reuses the Chainsaw infrastructure already shipping
+  for non-OCP components — no custom wait/polling logic.
+- CR values files can share structure with EKS/AKS/GKE values, keeping
+  overlay-specific values files portable across services.
+
+### Negative
+
+- The Helm bundle serves as a reference and validation artifact, but many
+  OpenShift users apply plain Kubernetes manifests directly. They can
+  run `helm template` on the emitted charts to produce static YAML, but
+  this is an extra step compared to a raw-manifest output mode.
+- Each OCP operator requires two registry entries (OLM + CR) instead of
+  one, increasing registry surface area.
+- In-tree Helm templates for OLM resources must be maintained in sync
+  with upstream operator channel/version changes.
+
+
+### Neutral
+
+- Bundle folder count grows (three folders per operator: OLM, readiness,
+  CR) but each folder is a standard local Helm chart — no new kinds.
+
+## Alternatives Considered
+
+### OLM-specific deployer with direct `kubectl apply` (rejected)
+
+A custom deployer that applies OLM manifests via `kubectl apply` and
+polls for CSV status via shell scripts (`install-direct.sh`).
+
+Rejected because it introduces a new deployer surface (`direct`)
+that the project is actively shrinking (see #899, #904).
 
 ## References
 
