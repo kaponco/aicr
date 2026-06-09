@@ -68,6 +68,7 @@
 //   - CriteriaServiceKind: kind (local clusters)
 //   - CriteriaServiceLKE: Linode LKE
 //   - CriteriaServiceBCM: NVIDIA Base Command Manager
+//   - CriteriaServiceOCP: Red Hat OpenShift Container Platform
 //   - CriteriaServiceAny: Any service (wildcard)
 //
 // Accelerator types for GPU selection:

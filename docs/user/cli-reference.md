@@ -425,7 +425,7 @@ Generate recipes using direct system parameters:
 **Flags:**
 | Flag | Short | Type | Description |
 |------|-------|------|-------------|
-| `--service` | | string | K8s service: eks, gke, aks, oke, kind, lke, bcm |
+| `--service` | | string | K8s service: eks, gke, aks, oke, ocp, kind, lke, bcm |
 | `--accelerator` | `--gpu` | string | Accelerator/GPU type: h100, h200, gb200, b200, a100, l40, rtx-pro-6000 |
 | `--intent` | | string | Workload intent: training, inference |
 | `--os` | | string | OS family: ubuntu, rhel, cos, amazonlinux, talos |
@@ -2247,7 +2247,7 @@ aicr mirror list [flags]
 | Flag | Short | Type | Default | Description |
 |------|-------|------|---------|-------------|
 | `--recipe` | `-r` | string | | Path/URI to a previously generated recipe. Supports: file paths, HTTP/HTTPS URLs, or ConfigMap URIs (`cm://namespace/name`). |
-| `--service` | | string | | Cloud service (e.g., `eks`, `gke`, `aks`). Alternative to `--recipe`. |
+| `--service` | | string | | Cloud service (e.g., `eks`, `gke`, `aks`, `ocp`). Alternative to `--recipe`. |
 | `--accelerator` | | string | | GPU accelerator (e.g., `h100`, `gb200`). Alternative to `--recipe`. |
 | `--intent` | | string | | Workload intent (`training` or `inference`). Alternative to `--recipe`. |
 | `--os` | | string | | Operating system (e.g., `ubuntu`). Alternative to `--recipe`. |

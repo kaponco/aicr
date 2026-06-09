@@ -13,8 +13,6 @@ emits Helm-only artifacts (upstream-helm or local-helm folders). There is no
 mechanism to express an OLM install followed by a Custom Resource
 configuration step within the current bundle structure.
 
-Users deploying AICR recipes on OCP today must manually translate Helm
-bundles into OLM resources, losing the validated-configuration guarantee.
 
 ## Rationale: OLM Lifecycle via In-Tree Helm Templates
 
@@ -29,34 +27,41 @@ waiting for the CSV to reach `Succeeded`, then applying the operator's
 CR — is expressed entirely through the existing bundler and deployer
 pipeline.
 
-## Non-Goals
+### How in-tree Helm charts work
 
-- Helm-to-OLM migration tooling or automatic conversion.
-- OCP-specific validator checks (separate work).
-- OperatorHub integration or certified-operator publishing.
-- OCP image mirroring or disconnected-install support (orthogonal to bundle
-  format).
-- Changes to the recipe resolution engine or overlay semantics.
+The bundler already supports manifest-only components via `KindLocalHelm`.
+When a component has `defaultRepository: ""` in the registry and the overlay
+provides `manifestFiles`, the bundler:
+
+1. Reads the raw Helm-templated YAML files listed in `manifestFiles`
+2. Generates a wrapper `Chart.yaml`
+3. Places the templates into `templates/`
+4. Writes `values.yaml` (from the component's `valuesFile`) and `install.sh`
+5. Emits a fully valid local Helm chart deployable with `helm upgrade --install ./`
+
+Existing components like `gke-nccl-tcpxo` and `nodewright-customizations`
+already use this pattern. OCP components follow the same mechanism.
 
 ## Decision
 
-Model each OCP operator as **two in-tree local Helm charts** within a single
-registry component:
+Model each OCP operator as **two in-tree local Helm charts**, each a
+separate registry component:
 
-1. **Phase 1 — OLM chart:** A local Helm chart whose templates contain the
-   OLM resources (Namespace, OperatorGroup, Subscription, optionally
-   CatalogSource). Values control channel, version, approval strategy, and
-   source catalog. A `readiness.yaml` gates on the operator CSV reaching
-   `Succeeded` before subsequent components deploy.
+1. **Phase 1 — OLM chart (`*-ocp-olm`):** A local Helm chart whose
+   templates contain the OLM resources (OperatorGroup, Subscription,
+   optionally CatalogSource). Values control channel,
+   version, approval strategy, and source catalog. A `readiness.yaml`
+   gates on the operator CSV reaching `Succeeded` before subsequent
+   components deploy.
 
-2. **Phase 2 — CR chart:** A local Helm chart whose templates contain the
-   operator's Custom Resource(s) (e.g., `ClusterPolicy` for GPU Operator,
-   `NicClusterPolicy` for Network Operator). Values control the CR spec.
-   Applied after Phase 1 completes.
+2. **Phase 2 — CR chart (`*-ocp`):** A local Helm chart whose templates
+   contain the operator's Custom Resource(s) (e.g., `ClusterPolicy` for
+   GPU Operator, `NodeFeatureDiscovery` for NFD). Values control
+   the CR spec. Applied after Phase 1 completes via `dependencyRefs`.
 
-The two-phase split maps directly to the existing `pre` + primary pattern
-in the localformat writer — or, more naturally, to two sibling components
-in the registry with an explicit dependency.
+The OCP overlay also disables base components that are replaced by OCP
+equivalents or not needed on the platform (monitoring, scheduling, DRA,
+etc.) using `overrides: { enabled: false }`.
 
 ### Bundle output
 
@@ -67,11 +72,10 @@ The bundler emits the standard numbered-folder structure. For a component
 001-gpu-operator-ocp-olm/              # KindLocalHelm — OLM resources
     Chart.yaml
     templates/
-        namespace.yaml
         operatorgroup.yaml
         subscription.yaml
     values.yaml
-    install.sh
+    install.sh                         # includes --create-namespace
 002-gpu-operator-ocp-olm-readiness/    # Readiness gate — waits for CSV Succeeded
     Chart.yaml
     templates/
@@ -111,14 +115,13 @@ dependency:
 - name: gpu-operator-ocp
   displayName: GPU Operator OCP (CR)
   valueOverrideKeys: [gpuoperatorocp]
-  dependencyRefs: [gpu-operator-ocp-olm]
   helm:
     defaultRepository: ""           # in-tree local chart
     defaultNamespace: nvidia-gpu-operator
 ```
 
-`dependencyRefs` ensures the OLM chart is always ordered before the CR
-chart in `DeploymentOrder`.
+Dependency ordering (`dependencyRefs`) is declared in the overlay, not the
+registry, because it is specific to the OCP deployment topology.
 
 ### In-tree chart layout
 
@@ -128,9 +131,8 @@ recipes/components/
 │   ├── values.yaml                # channel, source, approval defaults
 │   ├── readiness.yaml             # gates on CSV reaching Succeeded
 │   └── manifests/
-│       ├── namespace.yaml         # Helm template: {{ .Values.namespace }}
-│       ├── operatorgroup.yaml     # Helm template: {{ .Values.operatorGroup.* }}
-│       └── subscription.yaml      # Helm template: {{ .Values.subscription.* }}
+│       ├── operatorgroup.yaml     # Helm template: {{ $v.operatorGroup.* }}
+│       └── subscription.yaml      # Helm template: {{ $v.subscription.* }}
 ├── gpu-operator-ocp/
 │   ├── values.yaml                # ClusterPolicy spec defaults
 │   ├── values-training.yaml       # training overrides (e.g., migManager, gdrcopy)
@@ -142,6 +144,10 @@ Manifests are **Helm templates** — they use `{{ .Values.xxx }}` syntax and
 are rendered by Helm at install time with the merged values. The localformat
 writer places them into the generated chart's `templates/` directory.
 
+Overlays reference these manifests via `manifestFiles` in `componentRefs`.
+This is the existing mechanism used by `gke-nccl-tcpxo`,
+`nodewright-customizations`, and others.
+
 This enables the full overlay system: overlays reference overlay-specific
 values files via `valuesFile` in `componentRefs`, and users can customize
 at bundle time via `--set gpuoperatorocp:spec.driver.version=570.86.16`.
@@ -149,7 +155,8 @@ at bundle time via `--set gpuoperatorocp:spec.driver.version=570.86.16`.
 ### Overlay structure
 
 OCP overlays follow the existing pattern. A new `service: ocp` criteria
-value is added:
+value is added. The overlay disables base components that are replaced by
+OCP equivalents or not applicable to the platform:
 
 ```yaml
 # recipes/overlays/ocp.yaml
@@ -158,34 +165,25 @@ apiVersion: aicr.nvidia.com/v1alpha1
 metadata:
   name: ocp
 spec:
-  base: base
   criteria:
     service: ocp
   componentRefs:
-    - name: gpu-operator-ocp-olm
+    # OLM + CR pairs with manifestFiles
+    - name: nfd-ocp-olm
       type: Helm
-    - name: gpu-operator-ocp
+      valuesFile: components/nfd-ocp-olm/values.yaml
+      manifestFiles:
+        - components/nfd-ocp-olm/manifests/operatorgroup.yaml
+        - components/nfd-ocp-olm/manifests/subscription.yaml
+    - name: nfd-ocp
       type: Helm
+      valuesFile: components/nfd-ocp/values.yaml
+      manifestFiles:
+        - components/nfd-ocp/manifests/nodefeaturediscovery.yaml
+      dependencyRefs: [nfd-ocp-olm]
+    
+    # ... additional disabled components omitted for brevity
 
-# recipes/overlays/ocp-training.yaml
-kind: RecipeMetadata
-apiVersion: aicr.nvidia.com/v1alpha1
-metadata:
-  name: ocp-training
-spec:
-  base: ocp
-  criteria:
-    service: ocp
-    intent: training
-  mixins:
-    - os-rhel
-  constraints:
-    - name: K8s.server.version
-      value: ">= 1.29"
-  componentRefs:
-    - name: gpu-operator-ocp
-      type: Helm
-      valuesFile: components/gpu-operator-ocp/values-training.yaml
 ```
 
 ### Deployer behavior
@@ -198,6 +196,20 @@ which all existing deployers already handle:
 | Helm | `helm upgrade --install` via `deploy.sh` | `--wait --wait-for-jobs` (readiness Job) | `helm upgrade --install` |
 | Argo CD | `Application` CR, sync-wave N | `Application` CR, sync-wave N+1 | `Application` CR, sync-wave N+2 |
 | Helmfile | Release entry | Release entry with `wait: true` | Release entry |
+
+### Why OCP components use separate names
+
+OCP operators cannot reuse the base component names (`nfd`, `gpu-operator`)
+because the overlay merge treats `source: ""` as "not set" rather than
+"explicitly empty." When the OCP overlay references `nfd` with
+`source: ""`, the merge preserves the base's upstream Helm repository URL,
+producing a mixed component (upstream chart + manifestFiles) that emits
+an unwanted `-post` folder.
+
+Instead, OCP components use dedicated names (`nfd-ocp-olm`, `nfd-ocp`,
+`gpu-operator-ocp-olm`, `gpu-operator-ocp`) and the OCP overlay disables
+the base components via `overrides: { enabled: false }`. The bundler
+skips disabled components during bundle generation.
 
 ### OLM readiness gate
 
@@ -333,39 +345,14 @@ works outside of AICR with a standard Helm installation.
 
 | Operator | OLM Component | CR Component | CR Kind |
 |----------|--------------|--------------|---------|
-| GPU Operator | `gpu-operator-ocp-olm` | `gpu-operator-ocp` | `ClusterPolicy` |
-| Network Operator | `network-operator-ocp-olm` | `network-operator-ocp` | `NicClusterPolicy` |
 | Node Feature Discovery | `nfd-ocp-olm` | `nfd-ocp` | `NodeFeatureDiscovery` |
+| GPU Operator | `gpu-operator-ocp-olm` | `gpu-operator-ocp` | `ClusterPolicy` |
 
-Additional operators (cert-manager, Prometheus) use the same two-phase
-pattern. Each operator pair is self-contained — the OLM chart installs the
-operator, the CR chart configures it.
+Additional operators use the same two-phase pattern. Each operator pair
+is self-contained — the OLM chart installs the operator, the CR chart
+configures it.
 
-## Files Changing
 
-| File | Change |
-|------|--------|
-| `recipes/registry.yaml` | Add OCP component entries (OLM + CR pairs) |
-| `recipes/components/gpu-operator-ocp-olm/` | New: OLM chart values + manifest templates |
-| `recipes/components/gpu-operator-ocp/` | New: CR chart values + manifest templates |
-| `recipes/components/network-operator-ocp-olm/` | New: OLM chart |
-| `recipes/components/network-operator-ocp/` | New: CR chart |
-| `recipes/components/nfd-ocp-olm/` | New: OLM chart |
-| `recipes/components/nfd-ocp/` | New: CR chart |
-| `recipes/overlays/ocp.yaml` | New: base OCP overlay |
-| `recipes/overlays/ocp-training.yaml` | New: OCP training overlay |
-| `recipes/overlays/ocp-inference.yaml` | New: OCP inference overlay |
-| `recipes/mixins/os-rhel.yaml` | New: RHEL OS constraints mixin |
-| `pkg/recipe/criteria.go` | Add `CriteriaServiceOCP` constant |
-| `api/aicr/v1/server.yaml` | Add `ocp` to service enum |
-| `docs/user/cli-reference.md` | Document `ocp` service value |
-
-### Not changing
-
-- `pkg/bundler/deployer/` — all deployers already handle `KindLocalHelm`.
-- `pkg/bundler/deployer/localformat/writer.go` — existing folder numbering
-  and `KindLocalHelm` generation covers the OCP case.
-- `pkg/bundler/bundler.go` — no new deployer type needed.
 
 ## Testing Strategy
 
@@ -377,12 +364,15 @@ operator, the CR chart configures it.
 
 ## Acceptance Criteria
 
-1. `aicr recipe --service ocp --accelerator h100 --intent training --os rhel`
-   produces a recipe with OLM + CR component pairs.
-2. `aicr bundle -r recipe.yaml -o ./bundles` emits numbered folders with
-   valid Helm charts for both OLM and CR phases.
-3. `aicr bundle -r recipe.yaml --deployer argocd -o ./bundles` emits Argo CD
-   Applications with correct sync-wave ordering (OLM before CR).
+1. `aicr recipe --service ocp --intent training`
+   produces a recipe with OLM + CR component pairs and disabled base
+   components.
+2. `aicr bundle -r recipe.yaml --readiness-hooks -o ./bundles` emits
+   numbered folders with valid Helm charts for OLM, readiness gate, and
+   CR phases (disabled components skipped).
+3. `aicr bundle -r recipe.yaml --readiness-hooks --deployer argocd -o ./bundles`
+   emits Argo CD Applications with correct sync-wave ordering (OLM →
+   readiness → CR).
 4. `make qualify` passes.
 5. Chainsaw tests verify folder structure and manifest content for OCP
    bundles.
@@ -410,7 +400,12 @@ operator, the CR chart configures it.
   one, increasing registry surface area.
 - In-tree Helm templates for OLM resources must be maintained in sync
   with upstream operator channel/version changes.
-
+- OCP components cannot reuse base component names (`nfd`,
+  `gpu-operator`) because the overlay merge treats `source: ""` as "not
+  set" and preserves the base's upstream repository URL, producing a
+  mixed component with an unwanted `-post` folder. Separate names
+  (`*-ocp-olm`, `*-ocp`) with `enabled: false` on the base components
+  are the workaround.
 
 ### Neutral
 
@@ -427,10 +422,4 @@ polls for CSV status via shell scripts (`install-direct.sh`).
 Rejected because it introduces a new deployer surface (`direct`)
 that the project is actively shrinking (see #899, #904).
 
-## References
 
-- [OLM Architecture](https://olm.operatorframework.io/docs/concepts/olm-architecture/)
-- Existing two-phase pattern: `KindUpstreamHelm` + `-post` `KindLocalHelm`
-  in `pkg/bundler/deployer/localformat/writer.go`
-- Component dependency ordering: `dependencyRefs` in `recipes/registry.yaml`
-- Overlay composition: [ADR-005](005-overlay-refactoring.md)
