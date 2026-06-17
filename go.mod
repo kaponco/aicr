@@ -16,7 +16,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/sigstore/protobuf-specs v0.5.1
 	github.com/sigstore/sigstore v1.10.8
-	github.com/sigstore/sigstore-go v1.2.0
+	github.com/sigstore/sigstore-go v1.2.1
 	github.com/stretchr/testify v1.11.1
 	github.com/theupdateframework/go-tuf/v2 v2.4.2
 	github.com/urfave/cli/v3 v3.9.0
