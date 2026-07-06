@@ -92,6 +92,13 @@ spec:
         - components/cert-manager-ocp-olm/manifests/operatorgroup.yaml
         - components/cert-manager-ocp-olm/manifests/subscription.yaml
 
+    # User workload monitoring — enables OCP Prometheus to scrape
+    # ServiceMonitors in user namespaces (e.g., DCGM exporter in gpu-operator)
+    - name: prometheus-adapter-ocp
+      type: Helm
+      manifestFiles:
+        - components/prometheus-adapter-ocp/manifests/cluster-monitoring-config.yaml
+
     # nvsentinel — upstream Helm chart, no OLM variant needed
     - name: nvsentinel
       type: Helm
