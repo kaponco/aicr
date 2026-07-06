@@ -813,3 +813,13 @@ components:
     helm:
       defaultRepository: ""
       defaultNamespace: cert-manager-operator
+
+  - name: prometheus-adapter-ocp
+    displayName: Prometheus Adapter OCP
+    valueOverrideKeys:
+      - prometheusadapterocp
+    healthCheck:
+      assertFile: checks/prometheus-adapter-ocp/health-check.yaml
+    helm:
+      defaultRepository: ""
+      defaultNamespace: openshift-monitoring
