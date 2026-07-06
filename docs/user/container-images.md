@@ -19,7 +19,7 @@ A machine-readable **CycloneDX 1.6 JSON** companion to this page is produced by 
 <!-- BEGIN AICR-BOM -->
 ## Summary
 
-- Components: **36**
+- Components: **37**
 - Unique images: **86**
 - Distinct registries: **11**
 
@@ -46,6 +46,7 @@ _Rendering fidelity:_ `catalog-parity: charts are rendered with the shared recip
 | grove | helm | grove-charts | v0.1.0-alpha.8 | 1 |
 | k8s-ephemeral-storage-metrics | helm | k8s-ephemeral-storage-metrics/k8s-ephemeral-storage-metrics | 1.19.2 | 1 |
 | k8s-nim-operator | helm | k8s-nim-operator | 3.1.0 | 1 |
+| k8s-nim-operator-ocp-olm | manifest | — | — | 0 |
 | kai-scheduler | helm | kai-scheduler | v0.14.1 | 2 |
 | kube-prometheus-stack | helm | prometheus-community/kube-prometheus-stack | 84.4.0 | 8 |
 | kubeflow-trainer | helm | kubeflow-trainer | 2.2.0 | 3 |
@@ -166,6 +167,10 @@ _No images extracted._
 ### k8s-nim-operator
 
 - `nvcr.io/nvidia/cloud-native/k8s-nim-operator:v3.1.0`
+
+### k8s-nim-operator-ocp-olm
+
+_No images extracted._
 
 ### kai-scheduler
 

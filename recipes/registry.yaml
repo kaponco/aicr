@@ -806,6 +806,16 @@ components:
       defaultRepository: ""
       defaultNamespace: gpu-operator
 
+  - name: k8s-nim-operator-ocp-olm
+    displayName: NVIDIA NIM Operator OCP (OLM)
+    valueOverrideKeys:
+      - k8snimoperatorocpolm
+    healthCheck:
+      assertFile: checks/k8s-nim-operator-ocp-olm/health-check.yaml
+    helm:
+      defaultRepository: ""
+      defaultNamespace: nvidia-nim-operator
+
   - name: network-operator-ocp-olm
     displayName: Network Operator OCP (OLM)
     valueOverrideKeys:

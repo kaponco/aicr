@@ -408,6 +408,7 @@ These are the recipe **components** in [`recipes/registry.yaml`](https://github.
 | `grove` | Dynamo pod lifecycle management |
 | `k8s-ephemeral-storage-metrics` | Ephemeral storage usage metrics |
 | `k8s-nim-operator` | NVIDIA NIM Operator for inference microservice deployments |
+| `k8s-nim-operator-ocp-olm` | NVIDIA NIM Operator for OpenShift via Operator Lifecycle Manager (OLM) |
 | `kai-scheduler` | DRA-aware gang scheduler with topology-aware placement |
 | `kube-prometheus-stack` | Prometheus, Grafana, Alertmanager monitoring stack |
 | `kubeflow-trainer` | Kubeflow Training Operator for distributed training |

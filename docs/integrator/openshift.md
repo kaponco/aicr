@@ -2,13 +2,15 @@
 
 ## Overview
 
-The **OpenShift deployment** models each OCP operator as two in-tree local Helm charts, following a two-phase lifecycle per component:
+The **OpenShift deployment** models each OCP operator as one or two in-tree local Helm charts, following a lifecycle per component:
 
 1. **Phase 1 — OLM chart (`*-ocp-olm`):** A local Helm chart whose templates contain the OLM resources (Namespace, OperatorGroup, Subscription). Values control channel, version, approval strategy, and source catalog. A readiness gate ensures the operator CSV reaches `Succeeded` before the next phase deploys.
 
 2. **Phase 2 — CR chart (`*-ocp`):** A local Helm chart whose templates contain the operator's Custom Resource (e.g., `ClusterPolicy`, `NodeFeatureDiscovery`, `NicClusterPolicy`). Values control the CR spec. Applied after Phase 1 completes via `dependencyRefs`.
 
-Every OCP-managed operator follows this same two-phase pattern. As additional operators are added to the OCP overlay, each one is modeled as an `*-ocp-olm` / `*-ocp` pair — no new deployment mechanisms are introduced.
+Most OCP-managed operators follow this two-phase pattern. As additional operators are added to the OCP overlay, each one is modeled as an `*-ocp-olm` / `*-ocp` pair, unless the operator needs no bootstrap CR — see the exception below.
+
+**Exception — OLM-only operators.** An operator whose owned CRDs are workload-scoped resources applied by consumers, rather than a bootstrap CR the platform overlay itself must create, is modeled as `*-ocp-olm` alone, with no `*-ocp` counterpart. `k8s-nim-operator-ocp-olm` is the example: the NIM Operator's CRDs (`NimCache`, `NimService`, `NimPipeline`, etc.) are created by users deploying individual NIM microservices, not by the recipe at install time — unlike GPU Operator's `ClusterPolicy` or NFD's `NodeFeatureDiscovery`, which configure the operator's own operand rollout and must exist for the operator to do anything useful.
 
 ### Why Helm?
 
@@ -64,7 +66,7 @@ When `--readiness-hooks` is enabled, the bundler emits a `-readiness` folder bet
 
 ### Naming Convention
 
-OCP components use dedicated names following the pattern `<operator>-ocp-olm` and `<operator>-ocp` rather than reusing the base component names. The base OCP overlay disables the upstream Helm-based components (e.g., `gpu-operator`, `nfd`) that are replaced by their OLM equivalents, and also disables components that are not applicable to the OCP platform (e.g., components managed natively by OpenShift or not yet supported).
+OCP components use dedicated names following the pattern `<operator>-ocp-olm` and `<operator>-ocp` rather than reusing the base component names. The base OCP overlay disables the upstream Helm-based components (e.g., `gpu-operator`, `nfd`) that are replaced by their OLM equivalents, and also disables components that are not applicable to the OCP platform (e.g., components managed natively by OpenShift or not yet supported). Not every operator has a `-ocp` counterpart — an operator is modeled as OLM-only (`<operator>-ocp-olm` with no paired CR chart) when its CSV's owned CRDs are consumed directly by workloads rather than needing a bootstrap CR from the platform overlay itself (see the "Exception — OLM-only operators" note above).
 
 The list of supported components and their OLM/CR pairs grows over time. Refer to the base OCP overlay (`recipes/overlays/ocp.yaml`) and the component registry (`recipes/registry.yaml`) for the current set of supported operators.
 
@@ -123,7 +125,7 @@ spec:
 ...
 ```
 
-The `dependencyRefs` create a deployment ordering chain across all operators. Each CR component depends on its OLM counterpart, and operators that require prerequisites (e.g., GPU Operator depends on NFD labels) declare cross-operator dependencies.
+The `dependencyRefs` create a deployment ordering chain across all operators. Each CR component depends on its OLM counterpart, and operators that require prerequisites (e.g., GPU Operator depends on NFD labels) declare cross-operator dependencies. An OLM-only operator (see the "Exception" note above) has no CR component to chain from — its `*-ocp-olm` entry declares `dependencyRefs` directly against whatever prerequisite it needs. For example, `k8s-nim-operator-ocp-olm` depends on `gpu-operator-ocp` (the GPU Operator's CR phase, since NIM workloads need GPU scheduling to be functional, not just the GPU Operator's Subscription installed).
 
 ### 2. Generate Bundle
 

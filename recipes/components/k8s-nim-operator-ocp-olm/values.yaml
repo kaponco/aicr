@@ -12,21 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Network Operator OCP OLM values
-# Controls the OLM Subscription that installs the Network Operator on OpenShift.
+# NVIDIA NIM Operator OCP OLM values
+# Controls the OLM Subscription that installs the certified NIM Operator on
+# OpenShift. The CSV's installModes support AllNamespaces only, so
+# operatorGroup.targetNamespaces stays empty.
 
-namespace: nvidia-network-operator
+namespace: nvidia-nim-operator
 subscription:
-  name: nvidia-network-operator
-  channel: v25.10
+  name: nim-operator-certified
+  channel: stable
   source: certified-operators
   sourceNamespace: openshift-marketplace
   installPlanApproval: Automatic
 operatorGroup:
-  name: network-operator-group
-  # v25.10.0's CSV supports OwnNamespace/SingleNamespace only (AllNamespaces
-  # is explicitly unsupported) -- an empty list here yields AllNamespaces
-  # mode and the CSV fails with "AllNamespaces InstallModeType not
-  # supported, cannot configure to watch all namespaces".
-  targetNamespaces:
-    - nvidia-network-operator
+  name: nim-operator-group
+  targetNamespaces: []
