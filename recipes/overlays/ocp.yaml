@@ -84,7 +84,6 @@ spec:
       dependencyRefs:
         - network-operator-ocp-olm
 
-    # cert-manager via OLM (required by nvsentinel for webhook TLS)
     - name: cert-manager-ocp-olm
       type: Helm
       valuesFile: components/cert-manager-ocp-olm/values.yaml

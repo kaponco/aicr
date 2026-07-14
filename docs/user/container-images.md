@@ -19,7 +19,7 @@ A machine-readable **CycloneDX 1.6 JSON** companion to this page is produced by 
 <!-- BEGIN AICR-BOM -->
 ## Summary
 
-- Components: **33**
+- Components: **35**
 - Unique images: **85**
 - Distinct registries: **11**
 
@@ -36,6 +36,7 @@ _Rendering fidelity:_ `catalog-parity: charts are rendered with the shared recip
 | aws-ebs-csi-driver | helm | aws-ebs-csi-driver/aws-ebs-csi-driver | 2.59.0 | 6 |
 | aws-efa | helm | aws-efa-k8s-device-plugin | v0.5.29 | 1 |
 | cert-manager | helm | jetstack/cert-manager | v1.20.2 | 4 |
+| cert-manager-ocp-olm | manifest | — | — | 0 |
 | dynamo-platform | helm | dynamo-platform | 1.2.1 | 3 |
 | gatekeeper | helm | gatekeeper/gatekeeper | 3.22.2 | 3 |
 | gke-nccl-tcpxo | manifest | — | — | 4 |
@@ -60,6 +61,7 @@ _Rendering fidelity:_ `catalog-parity: charts are rendered with the shared recip
 | nvidia-dra-driver-gpu | helm | dra-driver-nvidia-gpu | 0.4.1 | 1 |
 | nvsentinel | helm | nvsentinel | v1.9.0 | 6 |
 | prometheus-adapter | helm | prometheus-community/prometheus-adapter | 5.3.0 | 1 |
+| prometheus-adapter-ocp | manifest | — | — | 0 |
 | prometheus-operator-crds | helm | prometheus-community/prometheus-operator-crds | 28.0.1 | 0 |
 | slinky-slurm | helm | slurm | 1.2.0 | 5 |
 | slinky-slurm-operator | helm | slurm-operator | 1.2.0 | 2 |
@@ -103,6 +105,10 @@ _No images extracted._
 - `quay.io/jetstack/cert-manager-controller:v1.20.2`
 - `quay.io/jetstack/cert-manager-startupapicheck:v1.20.2`
 - `quay.io/jetstack/cert-manager-webhook:v1.20.2`
+
+### cert-manager-ocp-olm
+
+_No images extracted._
 
 ### dynamo-platform
 
@@ -243,6 +249,10 @@ _No images extracted._
 ### prometheus-adapter
 
 - `registry.k8s.io/prometheus-adapter/prometheus-adapter:v0.12.0`
+
+### prometheus-adapter-ocp
+
+_No images extracted._
 
 ### prometheus-operator-crds
 
