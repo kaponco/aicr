@@ -49,6 +49,10 @@ The Operator Lifecycle Manager provides a declarative approach to managing opera
 - **Entitlement**: RHEL-based driver builds may require Red Hat entitlement ConfigMaps
 - **Version Alignment**: Operator channel versions must align with OpenShift Container Platform (OCP) version
 
+### Cluster Privileges Required
+
+Some OCP components need SCCs beyond the default `restricted-v2` — e.g. `nvidia-dra-driver-gpu`'s upstream chart auto-detects OpenShift and binds its kubelet-plugin to `system:openshift:scc:privileged`/`anyuid` on its own. Granting an SCC is itself a privileged action, so whoever's identity runs the deploy must already hold that permission — typically cluster-admin, or a role an admin has explicitly delegated.
+
 ### Readiness Gates
 
 Each OLM component carries a `readiness.yaml` using a Chainsaw assertion that
@@ -71,6 +75,8 @@ When `--readiness-hooks` is enabled, the bundler emits a `-readiness` folder bet
 ### Naming Convention
 
 OCP components use dedicated names following the pattern `<operator>-ocp-olm` and `<operator>-ocp` rather than reusing the base component names. The base OCP overlay disables the upstream Helm-based components (e.g., `gpu-operator`, `nfd`) that are replaced by their OLM equivalents, and also disables components that are not applicable to the OCP platform (e.g., components managed natively by OpenShift or not yet supported).
+
+Not every OCP component goes through OLM, though. Some (e.g. `nvidia-dra-driver-gpu`) are real upstream Helm charts, not OLM operators, and stay enabled on OCP under their base component name, unmodified, rather than getting an `*-ocp-olm`/`*-ocp` pair — they're deployed and updated the same way as on any other service.
 
 The list of supported components and their OLM/CR pairs grows over time. Refer to the base OCP overlay (`recipes/overlays/ocp.yaml`) and the component registry (`recipes/registry.yaml`) for the current set of supported operators.
 
@@ -181,6 +187,8 @@ ocp-bundle/
 Each numbered folder is a standard local Helm chart. The `deploy.sh` script installs them sequentially. Readiness folders (`*-readiness`) use `helm install --wait --timeout` to block until the gate passes.
 
 ### 3. Deploy Components
+
+> Run this as (or delegate SCC-granting permissions to) an identity with cluster-admin-equivalent rights — some components require it. See [Cluster Privileges Required](#cluster-privileges-required).
 
 The `deploy.sh` script installs all components in dependency order. Each folder is a self-contained Helm chart:
 

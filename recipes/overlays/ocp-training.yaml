@@ -24,9 +24,5 @@ spec:
     service: ocp
     intent: training
 
-  constraints:
-    - name: K8s.server.version
-      value: ">= 1.29"
-
 # No training-specific component overrides — all GPU Operator settings
 # (including gdrcopy) are in the base OCP values.
