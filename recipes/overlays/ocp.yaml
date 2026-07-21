@@ -22,8 +22,10 @@ spec:
     service: ocp
 
   constraints:
+    # nvidia-dra-driver-gpu (see componentRefs below) declares
+    # kubeVersion: >=1.32.0-0 in its chart, i.e. OCP 4.19+.
     - name: K8s.server.version
-      value: ">= 1.29"
+      value: ">= 1.32"
 
   componentRefs:
     # OCP uses OLM-managed operators via in-tree Helm charts.
@@ -104,6 +106,11 @@ spec:
       overrides:
         enabled: false
 
+    - name: nvidia-dra-driver-gpu
+      type: Helm
+      dependencyRefs:
+        - gpu-operator-ocp
+
     # Disable base components not needed on OCP
     - name: nfd
       type: Helm
@@ -134,10 +141,6 @@ spec:
       overrides:
         enabled: false
     - name: nodewright-operator
-      type: Helm
-      overrides:
-        enabled: false
-    - name: nvidia-dra-driver-gpu
       type: Helm
       overrides:
         enabled: false

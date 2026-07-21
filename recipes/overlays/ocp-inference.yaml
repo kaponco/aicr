@@ -24,8 +24,4 @@ spec:
     service: ocp
     intent: inference
 
-  constraints:
-    - name: K8s.server.version
-      value: ">= 1.29"
-
   componentRefs: []
