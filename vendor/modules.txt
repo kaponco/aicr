@@ -628,8 +628,9 @@ github.com/monochromegane/go-gitignore
 # github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 ## explicit
 github.com/munnerz/goautoneg
-# github.com/nvidia/k8s-launch-kit v0.0.0-20260702160332-47513d099b15
+# github.com/nvidia/k8s-launch-kit v0.0.0-20260713111738-0507f25caee7
 ## explicit; go 1.26.2
+github.com/nvidia/k8s-launch-kit/pkg/assets
 github.com/nvidia/k8s-launch-kit/pkg/config
 github.com/nvidia/k8s-launch-kit/pkg/kubeclient
 github.com/nvidia/k8s-launch-kit/pkg/networkoperatorplugin/discovery

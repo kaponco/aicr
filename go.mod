@@ -12,7 +12,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/in-toto/attestation v1.2.0
 	github.com/kyverno/chainsaw v0.2.15
-	github.com/nvidia/k8s-launch-kit v0.0.0-20260702160332-47513d099b15
+	github.com/nvidia/k8s-launch-kit v0.0.0-20260713111738-0507f25caee7
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/prometheus/client_golang v1.23.2
