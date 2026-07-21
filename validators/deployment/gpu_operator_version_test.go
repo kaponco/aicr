@@ -59,6 +59,11 @@ func TestExtractVersionFromImage(t *testing.T) {
 			image: "host:5000/nvidia/gpu-operator:v1.0.0",
 			want:  "v1.0.0",
 		},
+		{
+			name:  "digest-pinned image returns empty",
+			image: "registry.example.com/nvidia/gpu-operator@sha256:634471cdfedcc3bd6b4412a905a9fbc9a9bf91df7f436aa00454b088d087c60a",
+			want:  "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

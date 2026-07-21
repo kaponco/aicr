@@ -845,3 +845,13 @@ components:
     helm:
       defaultRepository: ""
       defaultNamespace: openshift-nfd
+
+  - name: cert-manager-ocp-olm
+    displayName: cert-manager OCP (OLM)
+    valueOverrideKeys:
+      - certmanagerocpolm
+    healthCheck:
+      assertFile: checks/cert-manager-ocp-olm/health-check.yaml
+    helm:
+      defaultRepository: ""
+      defaultNamespace: cert-manager-operator

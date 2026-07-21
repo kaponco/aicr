@@ -19,7 +19,7 @@ A machine-readable **CycloneDX 1.6 JSON** companion to this page is produced by 
 <!-- BEGIN AICR-BOM -->
 ## Summary
 
-- Components: **34**
+- Components: **35**
 - Unique images: **86**
 - Distinct registries: **11**
 
@@ -36,6 +36,7 @@ _Rendering fidelity:_ `catalog-parity: charts are rendered with the shared recip
 | aws-ebs-csi-driver | helm | aws-ebs-csi-driver/aws-ebs-csi-driver | 2.59.0 | 6 |
 | aws-efa | helm | aws-efa-k8s-device-plugin | v0.5.29 | 1 |
 | cert-manager | helm | jetstack/cert-manager | v1.20.2 | 4 |
+| cert-manager-ocp-olm | manifest | — | — | 0 |
 | dynamo-platform | helm | dynamo-platform | 1.2.1 | 3 |
 | gatekeeper | helm | gatekeeper/gatekeeper | 3.22.2 | 3 |
 | gke-nccl-tcpxo | manifest | — | — | 4 |
@@ -104,6 +105,10 @@ _No images extracted._
 - `quay.io/jetstack/cert-manager-controller:v1.20.2`
 - `quay.io/jetstack/cert-manager-startupapicheck:v1.20.2`
 - `quay.io/jetstack/cert-manager-webhook:v1.20.2`
+
+### cert-manager-ocp-olm
+
+_No images extracted._
 
 ### dynamo-platform
 

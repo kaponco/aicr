@@ -129,6 +129,11 @@ func getVersionFromDeployment(ctx context.Context, clientset kubernetes.Interfac
 }
 
 func extractVersionFromImage(image string) string {
+	// Digest-pinned refs (name@sha256:...) carry no version; the digest
+	// hex would otherwise be misread as the tag.
+	if strings.Contains(image, "@sha256:") {
+		return ""
+	}
 	idx := strings.LastIndex(image, ":")
 	if idx == -1 {
 		return ""

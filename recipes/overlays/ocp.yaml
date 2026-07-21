@@ -84,6 +84,13 @@ spec:
       dependencyRefs:
         - network-operator-ocp-olm
 
+    - name: cert-manager-ocp-olm
+      type: Helm
+      valuesFile: components/cert-manager-ocp-olm/values.yaml
+      manifestFiles:
+        - components/cert-manager-ocp-olm/manifests/operatorgroup.yaml
+        - components/cert-manager-ocp-olm/manifests/subscription.yaml
+
     # nvsentinel — upstream Helm chart, no OLM variant needed
     - name: nvsentinel
       type: Helm
